@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Net.NetworkInformation;
 using SiedlerVonSaffar.Networking;
+using SiedlerVonSaffar.GameLogic;
 
 namespace SiedlerVonSaffar
 {
@@ -20,10 +22,16 @@ namespace SiedlerVonSaffar
             Configuration.DeveloperParameter.init();
             Networking.ServerConfig.init();
             Networking.Broadcast.BroadcastServer.Instance.StartReceiving();
-            Networking.TCP.TcpServer.Instance.StartListening();
+            Networking.TCP.TcpServer.Instance.StartListening();            
 
-            Console.WriteLine("\nPress ENTER to continue...");
-            Console.Read();
+            string exitString = "";
+
+            do
+            {
+                Console.WriteLine("\ntip exit for closing the server...");
+                exitString = Console.ReadLine();
+            } while (exitString != "exit");
+            
         }
     }
 }

@@ -14,7 +14,7 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
+    <PlatformTarget>x86</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -58,6 +58,10 @@
     <ProjectReference Include="..\Config\Configuration.csproj">
       <Project>{bc38249c-7211-49ba-a8e1-9fb482ce9468}</Project>
       <Name>Configuration</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\GameLogic\GameLogic.csproj">
+      <Project>{f4285fa8-21df-44be-ad88-d2765df8cb0d}</Project>
+      <Name>GameLogic</Name>
     </ProjectReference>
     <ProjectReference Include="..\NetworkMessageProtocol\NetworkMessageProtocol.csproj">
       <Project>{cb424fae-4e9d-4c9a-b3e0-cc8b1594e650}</Project>

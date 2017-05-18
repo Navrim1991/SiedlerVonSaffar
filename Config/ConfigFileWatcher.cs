@@ -146,7 +146,7 @@ namespace SiedlerVonSaffar.Configuration
                     continue;
 
                 //streamWriter.WriteLine(i + " " + element.Name + "=" + element.GetValue(null) + ";");
-                int valueStartIndex = fileContents.IndexOf(element.Name); //plus 1 wegen dem "=" und dem darauffolgenden Wert
+                int valueStartIndex = fileContents.IndexOf(element.Name);
 
                 if (valueStartIndex < 0)
                 {

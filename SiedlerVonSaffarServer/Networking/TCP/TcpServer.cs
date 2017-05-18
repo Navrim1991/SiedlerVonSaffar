@@ -4,6 +4,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
+using System.Threading;
+using SiedlerVonSaffar.GameLogic;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -18,6 +20,7 @@ namespace SiedlerVonSaffar.Networking.TCP
         private static TcpServer singleton;
         private ARP.ArpRequest arpRequest;
         public bool StopListening { get; set; }
+        private GameLogic.GameLogic gameLogic;
 
         private TcpServer()
         {
@@ -25,6 +28,8 @@ namespace SiedlerVonSaffar.Networking.TCP
             arpRequest = new ARP.ArpRequest();
 
             connections = new List<Socket>(4);
+
+            gameLogic = new GameLogic.GameLogic();
         }
 
         public static TcpServer Instance
@@ -51,6 +56,8 @@ namespace SiedlerVonSaffar.Networking.TCP
 
                 Configuration.DeveloperParameter.PrintDebug("TCP server started\n\r\tWaiting for TCP Connections");
 
+                gameLogic.RxQueue.Enqueue(new NetworkMessageProtocol.SocketStateObject());
+
                 while (connectionCount < ServerConfig.MAX_CONNECTIONS)
                 {
                     Socket acceptedConnection = listener.Accept();
@@ -65,6 +72,7 @@ namespace SiedlerVonSaffar.Networking.TCP
 
                     NetworkMessageProtocol.SocketStateObject state = new NetworkMessageProtocol.SocketStateObject();
                     state.WorkSocket = acceptedConnection;
+
                     acceptedConnection.BeginReceive(state.buffer, 0, NetworkMessageProtocol.SocketStateObject.BufferSize, 0,
                         ReceiveCallback, state);
                            
