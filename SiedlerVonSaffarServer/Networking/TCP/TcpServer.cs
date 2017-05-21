@@ -62,9 +62,7 @@ namespace SiedlerVonSaffar.Networking.TCP
                 while (connectionCount < ServerConfig.MAX_CONNECTIONS && !gameHasStarted)
                 {
                     if (gameLogic.GameHasStarted)
-                    {
                         break;
-                    }
 
                     Socket acceptedConnection = listener.Accept();
 
@@ -106,14 +104,12 @@ namespace SiedlerVonSaffar.Networking.TCP
         private void ReceiveCallback(IAsyncResult asyncResult)
         {
             NetworkMessageProtocol.SocketStateObject state = (NetworkMessageProtocol.SocketStateObject)asyncResult.AsyncState;
-
             int bytesRead = state.WorkSocket.EndReceive(asyncResult);
 
             if (bytesRead > 0)
             {
                 gameLogic.RxQueue.Enqueue(state);
-            }
-                
+            }                
 
             state.WorkSocket.BeginReceive(state.buffer, 0, NetworkMessageProtocol.SocketStateObject.BufferSize, 0,
                         ReceiveCallback, state);

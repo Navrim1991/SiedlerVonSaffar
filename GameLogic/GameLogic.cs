@@ -149,8 +149,7 @@ namespace SiedlerVonSaffar.GameLogic
                         }
                         else if (tcpProtocol.PLAYER_DATA.SequenceEqual(equalBytes))
                         {
-                            HandlePlayer(state.buffer, state.WorkSocket);
-                            
+                            HandlePlayer(state.buffer, state.WorkSocket);                            
                         }
                         else if (tcpProtocol.PLAYER_DEAL.SequenceEqual(equalBytes))
                         {

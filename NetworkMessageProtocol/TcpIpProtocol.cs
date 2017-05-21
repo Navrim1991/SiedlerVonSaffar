@@ -46,7 +46,7 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
                 return false;
             }
 
-            byte[] clientDataProtocol = { data[0], data[1], 0 , 0 };
+            byte[] clientDataProtocol = { 0, data[1], 0 , 0 };
 
             return (BitConverter.ToInt32(clientDataProtocol, 0) == TCP_IP_PROTOCOL_DATA_PATTERN) ? true : false;            
         }
