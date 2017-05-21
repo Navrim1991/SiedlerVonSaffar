@@ -61,19 +61,9 @@ namespace SiedlerVonSaffar.Networking.TCP
 
                 while (connectionCount < ServerConfig.MAX_CONNECTIONS && !gameHasStarted)
                 {
-                    if (gameLogic.TxQueue.Count > 0)
+                    if (gameLogic.GameHasStarted)
                     {
-                        object rxObject;
-                        gameLogic.TxQueue.TryDequeue(out rxObject);
-
-                        if (rxObject != null)
-                        {
-                            if (rxObject is bool)
-                                gameHasStarted = (bool)rxObject;
-
-                            if (gameHasStarted)
-                                break;
-                        }
+                        break;
                     }
 
                     Socket acceptedConnection = listener.Accept();
@@ -86,6 +76,9 @@ namespace SiedlerVonSaffar.Networking.TCP
                            
                     connectionCount++;
                 }
+
+                gameLogic.GameHasStarted = true;
+                gameLogic.PlayersReady = connectionCount;
 
                 Broadcast.BroadcastServer.Instance.Dispose();
             }
