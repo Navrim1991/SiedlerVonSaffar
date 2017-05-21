@@ -16,7 +16,6 @@ namespace SiedlerVonSaffar.Networking.TCP
     {
         private byte connectionCount = 0;
         private readonly object aSyncLock = null;
-        private List<Socket> connections;
         private static TcpServer singleton;
         private ARP.ArpRequest arpRequest;
         public bool StopListening { get; set; }
@@ -25,11 +24,9 @@ namespace SiedlerVonSaffar.Networking.TCP
         private TcpServer()
         {
             StopListening = false;
-            arpRequest = new ARP.ArpRequest();
-
-            connections = new List<Socket>(4);
 
             gameLogic = new GameLogic.GameLogic();
+
         }
 
         public static TcpServer Instance
@@ -37,7 +34,10 @@ namespace SiedlerVonSaffar.Networking.TCP
             get
             {
                 if (singleton == null)
+                {
                     singleton = new TcpServer();
+                }
+                    
 
                 return singleton;
             }
@@ -45,6 +45,7 @@ namespace SiedlerVonSaffar.Networking.TCP
 
         public void StartListening()
         {
+            gameLogic.RxQueue.Enqueue(this);
 
             Socket listener = new Socket(AddressFamily.InterNetwork,
                 SocketType.Stream, ProtocolType.Tcp);
@@ -56,68 +57,72 @@ namespace SiedlerVonSaffar.Networking.TCP
 
                 Configuration.DeveloperParameter.PrintDebug("TCP server started\n\r\tWaiting for TCP Connections");
 
-                while (connectionCount < ServerConfig.MAX_CONNECTIONS)
+                bool gameHasStarted = false;
+
+                while (connectionCount < ServerConfig.MAX_CONNECTIONS && !gameHasStarted)
                 {
+                    if (gameLogic.TxQueue.Count > 0)
+                    {
+                        object rxObject;
+                        gameLogic.TxQueue.TryDequeue(out rxObject);
+
+                        if (rxObject != null)
+                        {
+                            if (rxObject is bool)
+                                gameHasStarted = (bool)rxObject;
+
+                            if (gameHasStarted)
+                                break;
+                        }
+                    }
+
                     Socket acceptedConnection = listener.Accept();
 
-                    IPEndPoint remoteEndPoint = (IPEndPoint)acceptedConnection.RemoteEndPoint;
-                    IPEndPoint localEndPoint = (IPEndPoint)acceptedConnection.LocalEndPoint;
-
-                    PhysicalAddress remoteMac = arpRequest.Arp(remoteEndPoint);
-
-                    Configuration.DeveloperParameter.PrintDebug("TCP connection accepted\n\r\tip: " + remoteEndPoint.Address.ToString() +
-                        "\n\r\tmac: " + remoteMac.ToString());
-
                     NetworkMessageProtocol.SocketStateObject state = new NetworkMessageProtocol.SocketStateObject();
-                    state.WorkSocket = acceptedConnection;
+                    state.WorkSocket = acceptedConnection;                    
 
                     acceptedConnection.BeginReceive(state.buffer, 0, NetworkMessageProtocol.SocketStateObject.BufferSize, 0,
                         ReceiveCallback, state);
                            
                     connectionCount++;
-                    connections.Add(acceptedConnection);
                 }
 
-                arpRequest = null;
                 Broadcast.BroadcastServer.Instance.Dispose();
             }
             catch (Exception ex)
             {
                 Configuration.DeveloperParameter.PrintDebug(ex.Message + "\n\r" + ex.StackTrace);
             }
+
+            object txObject;
+
+            while (true)
+            {
+                while (gameLogic.TxQueue.Count < 1) ;
+
+                gameLogic.TxQueue.TryDequeue(out txObject);
+
+                if (txObject is NetworkMessageProtocol.SocketStateObject)
+                {
+                    NetworkMessageProtocol.SocketStateObject state = (NetworkMessageProtocol.SocketStateObject)txObject;
+                    Send(state.WorkSocket, state.buffer);
+                }
+           }
         }
 
         private void ReceiveCallback(IAsyncResult asyncResult)
         {
             NetworkMessageProtocol.SocketStateObject state = (NetworkMessageProtocol.SocketStateObject)asyncResult.AsyncState;
-            Socket handler = state.WorkSocket;
 
-            int bytesRead = handler.EndReceive(asyncResult);
+            int bytesRead = state.WorkSocket.EndReceive(asyncResult);
 
             if (bytesRead > 0)
             {
-                if (protocol.isClientDataPattern(state.buffer))
-                {
-                    byte[] equalBytes = { state.buffer[0], state.buffer[1], state.buffer[2], state.buffer[3] };
+                gameLogic.RxQueue.Enqueue(state);
+            }
+                
 
-                    if (PLAYER_TURN.SequenceEqual(equalBytes))
-                    {
-                        List<Socket> connectionsToSendData = (from p in connections where p.RemoteEndPoint != handler.RemoteEndPoint select p).ToList<Socket>();
-
-                        foreach (Socket element in connectionsToSendData)
-                            Send(element, state.buffer);
-                    }
-
-
-                }
-                else if (Configuration.DeveloperParameter.TcpEcho)
-                {
-                    foreach (Socket element in connections)
-                        Send(element, state.buffer);
-                }
-            }        
-
-            handler.BeginReceive(state.buffer, 0, NetworkMessageProtocol.SocketStateObject.BufferSize, 0,
+            state.WorkSocket.BeginReceive(state.buffer, 0, NetworkMessageProtocol.SocketStateObject.BufferSize, 0,
                         ReceiveCallback, state);
         }
 
@@ -140,10 +145,6 @@ namespace SiedlerVonSaffar.Networking.TCP
                 // Complete sending the data to the remote device.
                 int bytesSent = handler.EndSend(asyncResult);
                 Console.WriteLine("Sent {0} bytes to client.", bytesSent);
-
-                //handler.Shutdown(SocketShutdown.Both);
-                //handler.Close();
-
             }
             catch (Exception ex)
             {

@@ -10,6 +10,30 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
     {
         private const int TCP_IP_PROTOCOL_DATA_PATTERN = 0x00000F00;
 
+        public readonly byte[] PLAYER_TURN;
+        public readonly byte[] PLAYER_DATA;
+        public readonly byte[] PLAYER_DEAL;
+        public readonly byte[] PLAYER_ROLL_DICE;
+        public readonly byte[] PLAYER_PLAY_PROGRESSCARD;
+        public readonly byte[] PLAYER_READY;
+        public readonly byte[] SERVER_CREATE_GAME;
+        public readonly byte[] SERVER_DATA;
+        public readonly byte[] SERVER_GIVE_RESOURCES;
+        public readonly byte[] SERVER_CHANGE_BANDIT;
+
+        public TcpIpProtocol(){
+            PLAYER_TURN = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_TURN);
+            PLAYER_DATA = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_DATA);
+            PLAYER_DEAL = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_DEAL);
+            PLAYER_ROLL_DICE = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_ROLL_DICE);
+            PLAYER_PLAY_PROGRESSCARD = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_PLAY_PROGRESSCARD);
+            PLAYER_READY = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_READY);
+            SERVER_CREATE_GAME = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_CREATE_GAME);
+            SERVER_DATA = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_DATA);
+            SERVER_GIVE_RESOURCES = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_GIVE_RESOURCES);
+            SERVER_CHANGE_BANDIT = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_CHANGE_BANDIT);
+        }
+
         public bool isClientDataPattern(byte[] data)
         {
             byte[] clientDataPatternBytes = BitConverter.GetBytes(TCP_IP_PROTOCOL_DATA_PATTERN);

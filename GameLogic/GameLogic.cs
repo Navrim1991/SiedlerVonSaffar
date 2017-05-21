@@ -10,34 +10,40 @@ using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization;
 using System.Collections.Concurrent;
+using System.Net.Sockets;
+using System.Net;
+using System.Net.NetworkInformation;
 
 namespace SiedlerVonSaffar.GameLogic
 {
     public class GameLogic
     {
-        private List<GameObjects.Player.Player> Players;
-        private GameObjects.Player.Player currentPlayer;
+        private Dictionary<GameObjects.Player.Player, Socket> Players;
+        public KeyValuePair<GameObjects.Player.Player, Socket> currentPlayer { get; private set; }
         private DataStruct.Container dataContainer;
         private ThreadStart gameLogicThreadStart;
         private Thread gameLogicThread;
+        private TcpIpProtocol tcpProtocol;
 
-        private int countResourceCardsBiosmass;
-        private int countResourceCardsCarbonFibres;
-        private int countResourceCardsDeuterium;
-        private int countResourceCardsFriendlyAliens;
-        private int countResourceCardsTitan;
+        private bool gameHasStarted = false;
+
         public ConcurrentQueue<object> RxQueue { get; private set; }
+        public ConcurrentQueue<object> TxQueue { get; private set; }
 
         public GameLogic()
         {
-            Players = new List<GameObjects.Player.Player>();
+            Players = new Dictionary<GameObjects.Player.Player, Socket>();
             dataContainer = new DataStruct.Container();
             RxQueue = new ConcurrentQueue<object>();
+            TxQueue = new ConcurrentQueue<object>();
             gameLogicThreadStart = new ThreadStart(Start);
             gameLogicThread = new Thread(gameLogicThreadStart);
             gameLogicThread.Name = "GameLogic";
+            tcpProtocol = new TcpIpProtocol();
             gameLogicThread.Start();
         }
+
+        //private void AddPlayer
 
         private void Start()
         {
@@ -48,12 +54,44 @@ namespace SiedlerVonSaffar.GameLogic
 
                 RxQueue.TryDequeue(out rxObject);
 
-                Type rxObjectType = rxObject.GetType();
+                if(rxObject is SocketStateObject)
+                {
+                    SocketStateObject state = (SocketStateObject)rxObject;
+                    if (tcpProtocol.isClientDataPattern(state.buffer))
+                    {
+                        byte[] equalBytes = { state.buffer[0], state.buffer[1], state.buffer[2], state.buffer[3] };
+
+                        if (tcpProtocol.PLAYER_TURN.SequenceEqual(equalBytes))
+                        {
+                            //container Data anpassen
+                        }
+                        else if (tcpProtocol.PLAYER_DATA.SequenceEqual(equalBytes))
+                        {
+                            //player hinzufügen
+                        }
+                        else if (tcpProtocol.PLAYER_DEAL.SequenceEqual(equalBytes))
+                        {
+                            //Spieler möchte handeln
+                        }
+                        else if (tcpProtocol.PLAYER_ROLL_DICE.SequenceEqual(equalBytes))
+                        {
+                            //spieler hat gewürfelt
+                        }
+                        else if (tcpProtocol.PLAYER_PLAY_PROGRESSCARD.SequenceEqual(equalBytes))
+                        {
+                            //spieler spielt prograss card
+                        }
+                        else if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
+                        {
+                            //spieler ist fertig
+                        }
+                    }
+                }
             }
         }
         private bool CanSetStructHyperloop()
         {
-            if (currentPlayer.ResourceCardsCarbonFibres.Count > 0 && currentPlayer.ResourceCardsDeuterium.Count > 0)
+            if (currentPlayer.Key.ResourceCardsCarbonFibres.Count > 0 && currentPlayer.Key.ResourceCardsDeuterium.Count > 0)
                 return true;
 
             return false;
@@ -61,8 +99,8 @@ namespace SiedlerVonSaffar.GameLogic
 
         private bool CanSetStructOutpost()
         {
-            if (currentPlayer.ResourceCardsCarbonFibres.Count > 0 && currentPlayer.ResourceCardsDeuterium.Count > 0
-                && currentPlayer.ResourceCardsFriendlyAlien.Count > 0 && currentPlayer.ResourceCardsBiomass.Count > 0)
+            if (currentPlayer.Key.ResourceCardsCarbonFibres.Count > 0 && currentPlayer.Key.ResourceCardsDeuterium.Count > 0
+                && currentPlayer.Key.ResourceCardsFriendlyAlien.Count > 0 && currentPlayer.Key.ResourceCardsBiomass.Count > 0)
                 return true;
 
             return false;
@@ -71,7 +109,7 @@ namespace SiedlerVonSaffar.GameLogic
 
         private bool CanSetStructCity()
         {
-            if (currentPlayer.ResourceCardsTitan.Count >= 3 && currentPlayer.ResourceCardsBiomass.Count > 2)
+            if (currentPlayer.Key.ResourceCardsTitan.Count >= 3 && currentPlayer.Key.ResourceCardsBiomass.Count > 2)
                 return true;
 
             return false;
@@ -109,7 +147,7 @@ namespace SiedlerVonSaffar.GameLogic
                                     GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)tmpAngle.Data;
 
                                     //Wenn eine Kante eine Eigene Straße beinhaltet darf eine Außenposten gebaut werden
-                                    if (hyperloop.PlayerID == currentPlayer.PlayerID)
+                                    if (hyperloop.PlayerID == currentPlayer.Key.PlayerID)
                                     {
                                         DataStruct.Angle upperAngle = element.UpperAngel;
                                         DataStruct.Angle lowerAngle = element.LowerAngel;
@@ -143,7 +181,7 @@ namespace SiedlerVonSaffar.GameLogic
                             GameObjects.Buildings.Outpost outpost = (GameObjects.Buildings.Outpost)tmpAngle.Data;
 
                             //Wenn der Außenposten dem spieler gehört, darf er eine Stadt Bauen
-                            if (outpost.PlayerID == currentPlayer.PlayerID)
+                            if (outpost.PlayerID == currentPlayer.Key.PlayerID)
                                 tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_CITY;
                             else
                                 tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
@@ -207,7 +245,7 @@ namespace SiedlerVonSaffar.GameLogic
                                     {
                                         GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)element.Data;
 
-                                        if (hyperloop.PlayerID == currentPlayer.PlayerID)
+                                        if (hyperloop.PlayerID == currentPlayer.Key.PlayerID)
                                         {
                                             tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
                                             break;
@@ -223,7 +261,7 @@ namespace SiedlerVonSaffar.GameLogic
                                     {
                                         GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)element.Data;
 
-                                        if (hyperloop.PlayerID == currentPlayer.PlayerID)
+                                        if (hyperloop.PlayerID == currentPlayer.Key.PlayerID)
                                         {
                                             tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
                                             break;
@@ -236,14 +274,14 @@ namespace SiedlerVonSaffar.GameLogic
                             }
 
                             //Wenn an der oberen Ecke ein eigenes Gebäude existiert
-                            if ((buildingUpperAngle != null && buildingUpperAngle.PlayerID == currentPlayer.PlayerID))
+                            if ((buildingUpperAngle != null && buildingUpperAngle.PlayerID == currentPlayer.Key.PlayerID))
                             {
                                 tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
                                 continue;
                             }
 
                             //Wenn an der unteren Ecke ein eigenes Gebäude existiert
-                            if ((buildingLowerAngle != null && buildingUpperAngle.PlayerID == currentPlayer.PlayerID))
+                            if ((buildingLowerAngle != null && buildingUpperAngle.PlayerID == currentPlayer.Key.PlayerID))
                             {
                                 tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
                                 continue;
