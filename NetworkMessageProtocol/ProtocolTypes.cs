@@ -17,6 +17,15 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
     [Flags]
     public enum TcpIpProtocolType
     {
-        DATA_CLIENT_TURN = 0x00000F01
+        PLAYER_TURN = 0x00000F01,
+        PLAYER_DATA = 0x00000F02,
+        PLAYER_DEAL = 0x00000F04,
+        PLAYER_ROLL_DICE = 0x00000F08,
+        PLAYER_PLAY_PROGRESSCARD = 0x00000F10,
+        PLAYER_READY = 0x00000F20,
+        SERVER_CREATE_GAME = 0x00F01000,
+        SERVER_DATA = 0x00F02000,
+        SERVER_GIVE_RESOURCES = 0x00F04000,
+        SERVER_CHANGE_BANDIT = 0x00F04000,
     }
 }

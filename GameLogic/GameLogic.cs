@@ -9,64 +9,83 @@ using System.Threading;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization;
+using System.Collections.Concurrent;
 
 namespace SiedlerVonSaffar.GameLogic
 {
     public class GameLogic
     {
         private List<GameObjects.Player.Player> Players;
-        private short currentPlayerID;
+        private GameObjects.Player.Player currentPlayer;
         private DataStruct.Container dataContainer;
         private ThreadStart gameLogicThreadStart;
         private Thread gameLogicThread;
-        public Queue<object> RxQueue { get; private set; }
+
+        private int countResourceCardsBiosmass;
+        private int countResourceCardsCarbonFibres;
+        private int countResourceCardsDeuterium;
+        private int countResourceCardsFriendlyAliens;
+        private int countResourceCardsTitan;
+        public ConcurrentQueue<object> RxQueue { get; private set; }
 
         public GameLogic()
         {
             Players = new List<GameObjects.Player.Player>();
             dataContainer = new DataStruct.Container();
-            RxQueue = new Queue<object>();
+            RxQueue = new ConcurrentQueue<object>();
             gameLogicThreadStart = new ThreadStart(Start);
             gameLogicThread = new Thread(gameLogicThreadStart);
             gameLogicThread.Name = "GameLogic";
             gameLogicThread.Start();
-
         }
 
         private void Start()
         {
-            SocketStateObject socketStateObject;
-
+            object rxObject; 
             while (true)
             {
                 while (RxQueue.Count < 1) ;
 
-                object a = RxQueue.Dequeue();
+                RxQueue.TryDequeue(out rxObject);
 
-                /*using (MemoryStream ms = new MemoryStream(socketStateObject.buffer))
-                {
-                    IFormatter br = new BinaryFormatter();
-                    dataContainer = (br.Deserialize(ms) as DataStruct.Container);
-                }*/
+                Type rxObjectType = rxObject.GetType();
             }
         }
+        private bool CanSetStructHyperloop()
+        {
+            if (currentPlayer.ResourceCardsCarbonFibres.Count > 0 && currentPlayer.ResourceCardsDeuterium.Count > 0)
+                return true;
 
-        private void createGameRules(short currentPlayerID)
+            return false;
+        }
+
+        private bool CanSetStructOutpost()
+        {
+            if (currentPlayer.ResourceCardsCarbonFibres.Count > 0 && currentPlayer.ResourceCardsDeuterium.Count > 0
+                && currentPlayer.ResourceCardsFriendlyAlien.Count > 0 && currentPlayer.ResourceCardsBiomass.Count > 0)
+                return true;
+
+            return false;
+
+        }
+
+        private bool CanSetStructCity()
+        {
+            if (currentPlayer.ResourceCardsTitan.Count >= 3 && currentPlayer.ResourceCardsBiomass.Count > 2)
+                return true;
+
+            return false;
+        }
+
+        private void checkAngles()
         {
             DataStruct.Angle[,] angles = dataContainer.Angles;
-            DataStruct.DataStruct[,] edges = dataContainer.Data;
-
-            int arrayDimensionZero = angles.GetLength(0);
-            int arrayDimensionOne = angles.GetLength(1);
-
-            int i;
-            int j;
 
             DataStruct.Angle tmpAngle;
 
-            for (i = 0; i < arrayDimensionZero; i++)
+            for (int i = 0; i < angles.GetLength(0); i++)
             {
-                for (j = 0; j < arrayDimensionOne; j++)
+                for (int j = 0; j < angles.GetLength(1); j++)
                 {
                     if (angles[i, j] == null)
                         continue;
@@ -80,21 +99,43 @@ namespace SiedlerVonSaffar.GameLogic
                     {
                         case DataStruct.BuildTypes.NONE:
 
+                            tmpAngle.BuildStruct = tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+
                             //Gehe alle kanten an den Ecken durch
                             foreach (DataStruct.Edge element in tmpAngle.Edges)
                             {
-                                if (element.BuildTyp == DataStruct.BuildTypes.HYPERLOOP)
+                                if (element.Data != null)
                                 {
                                     GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)tmpAngle.Data;
 
                                     //Wenn eine Kante eine Eigene Straße beinhaltet darf eine Außenposten gebaut werden
-                                    if (hyperloop.PlayerID == currentPlayerID)
+                                    if (hyperloop.PlayerID == currentPlayer.PlayerID)
                                     {
+                                        DataStruct.Angle upperAngle = element.UpperAngel;
+                                        DataStruct.Angle lowerAngle = element.LowerAngel;
+
                                         tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_OUTPOST;
-                                        break;
+
+                                        GameObjects.Buildings.Building building = null;
+
+                                        if (upperAngle.PositionX != tmpAngle.PositionX && upperAngle.PositionY != tmpAngle.PositionY)
+                                        {
+                                            if (upperAngle.Data != null)
+                                            {
+                                                tmpAngle.BuildStruct = tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+                                                break;
+                                            }
+                                        }
+
+                                        if (lowerAngle.PositionX != tmpAngle.PositionX && lowerAngle.PositionY != tmpAngle.PositionY)
+                                        {
+                                            if (lowerAngle.Data != null)
+                                            {
+                                                tmpAngle.BuildStruct = tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+                                                break;
+                                            }
+                                        }
                                     }
-                                    else
-                                        tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
                                 }
                             }
                             break;
@@ -102,7 +143,7 @@ namespace SiedlerVonSaffar.GameLogic
                             GameObjects.Buildings.Outpost outpost = (GameObjects.Buildings.Outpost)tmpAngle.Data;
 
                             //Wenn der Außenposten dem spieler gehört, darf er eine Stadt Bauen
-                            if (outpost.PlayerID == currentPlayerID)
+                            if (outpost.PlayerID == currentPlayer.PlayerID)
                                 tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_CITY;
                             else
                                 tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
@@ -111,15 +152,17 @@ namespace SiedlerVonSaffar.GameLogic
                     }
                 }
             }
+        }
 
-            arrayDimensionZero = edges.GetLength(0);
-            arrayDimensionOne = edges.GetLength(1);
+        private void checkEdges()
+        {
+            DataStruct.DataStruct[,] edges = dataContainer.Data;
 
             DataStruct.Edge tmpEdge;
 
-            for (i = 0; i < arrayDimensionZero; i++)
+            for (int i = 0; i < edges.GetLength(0); i++)
             {
-                for (j = 0; j < arrayDimensionOne; j++)
+                for (int j = 0; j < edges.GetLength(1); j++)
                 {
                     if (edges[i, j] == null)
                         continue;
@@ -128,74 +171,101 @@ namespace SiedlerVonSaffar.GameLogic
 
                     tmpEdge = (DataStruct.Edge)edges[i, j];
 
+                    GameObjects.Buildings.Outpost buildingUpperAngle = null;
+                    GameObjects.Buildings.Outpost buildingLowerAngle = null;
+
+                    //Wenn an der oberen Ecke ein Gebäude existiert 
+                    if (tmpEdge.UpperAngel.BuildTyp != DataStruct.BuildTypes.NONE)
+                    {
+                        if (tmpEdge.UpperAngel.BuildTyp == DataStruct.BuildTypes.OUTPOST)
+                            buildingUpperAngle = (GameObjects.Buildings.Outpost)tmpEdge.UpperAngel.Data;
+                        else
+                            buildingUpperAngle = (GameObjects.Buildings.City)tmpEdge.UpperAngel.Data;
+                    }
+
+                    //Wenn an der unteren Ecke ein Gebäude existiert
+                    if (tmpEdge.LowerAngel.BuildTyp != DataStruct.BuildTypes.NONE)
+                    {
+                        if (tmpEdge.UpperAngel.BuildTyp == DataStruct.BuildTypes.OUTPOST)
+                            buildingLowerAngle = (GameObjects.Buildings.Outpost)tmpEdge.UpperAngel.Data;
+                        else
+                            buildingLowerAngle = (GameObjects.Buildings.City)tmpEdge.UpperAngel.Data;
+                    }
+
                     switch (tmpEdge.BuildTyp)
                     {
                         case DataStruct.BuildTypes.NONE:
-                            GameObjects.Buildings.Outpost buildingUpperAngle = null;
-                            GameObjects.Buildings.Outpost buildingLowerAngle = null;
-
-                            //Wenn an der oberen Ecke ein Gebäude existiert 
-                            if (tmpEdge.UpperAngel.BuildTyp != DataStruct.BuildTypes.NONE)
+                            tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+                            //Wenn keine Gebäude oder nur ein Gebäude an dieser Kante existierem
+                            if (buildingUpperAngle == null || buildingLowerAngle == null)
                             {
-                                if (tmpEdge.UpperAngel.BuildTyp == DataStruct.BuildTypes.OUTPOST)
-                                    buildingUpperAngle = (GameObjects.Buildings.Outpost)tmpEdge.UpperAngel.Data;
-                                else
-                                    buildingUpperAngle = (GameObjects.Buildings.City)tmpEdge.UpperAngel.Data;
+                                //wenn eine eigene Hyperloop an der Kante angrenzt
+                                //Obere Kanten prüfen
+                                foreach (DataStruct.Edge element in tmpEdge.UpperAngel.Edges)
+                                {
+                                    if (element.Data != null && element.PositionX != j && element.PositionY != i)
+                                    {
+                                        GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)element.Data;
+
+                                        if (hyperloop.PlayerID == currentPlayer.PlayerID)
+                                        {
+                                            tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
+                                            break;
+                                        }
+
+                                    }
+                                }
+
+                                //Untere Kanten prüfen
+                                foreach (DataStruct.Edge element in tmpEdge.LowerAngel.Edges)
+                                {
+                                    if (element.Data != null && element.PositionX != j && element.PositionY != i)
+                                    {
+                                        GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)element.Data;
+
+                                        if (hyperloop.PlayerID == currentPlayer.PlayerID)
+                                        {
+                                            tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (tmpEdge.BuildStruct == DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP)
+                                    continue;
                             }
 
-                            //Wenn an der unteren Ecke ein Gebäude existiert
-                            if (tmpEdge.LowerAngel.BuildTyp != DataStruct.BuildTypes.NONE)
-                            {
-                                if (tmpEdge.UpperAngel.BuildTyp == DataStruct.BuildTypes.OUTPOST)
-                                    buildingLowerAngle = (GameObjects.Buildings.Outpost)tmpEdge.UpperAngel.Data;
-                                else
-                                    buildingLowerAngle = (GameObjects.Buildings.City)tmpEdge.UpperAngel.Data;
-                            }
-
-                            //Wenn keine Gebäude an dieser Kante existierem
-                            if (buildingUpperAngle == null && buildingLowerAngle == null)
-                            {
-                                tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
-                                continue;
-                            }
-
-                            //Wenn an der oberen Ecke ein eigenes Gebäude existiert und an der unteren Kante nicht
-                            if ((buildingUpperAngle != null && buildingUpperAngle.PlayerID == currentPlayerID) && buildingLowerAngle == null)
+                            //Wenn an der oberen Ecke ein eigenes Gebäude existiert
+                            if ((buildingUpperAngle != null && buildingUpperAngle.PlayerID == currentPlayer.PlayerID))
                             {
                                 tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
                                 continue;
                             }
 
-                            //Wenn an der unteren Ecke ein eigenes Gebäude existiert und an der oberen Kante nicht
-                            if (buildingUpperAngle == null && (buildingLowerAngle != null && buildingUpperAngle.PlayerID == currentPlayerID))
+                            //Wenn an der unteren Ecke ein eigenes Gebäude existiert
+                            if ((buildingLowerAngle != null && buildingUpperAngle.PlayerID == currentPlayer.PlayerID))
                             {
                                 tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
                                 continue;
-                            }
-
-                            //Wenn 2 Gebäude an der Kante existieren aber von unterschiedlichen Spielern
-                            if (buildingUpperAngle.PlayerID != buildingLowerAngle.PlayerID)
-                            {
-                                tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
-                                continue;
-                            }
-
-                            //Wenn 2 Gebäude existieren und beide die eigenen sind
-                            if (buildingUpperAngle.PlayerID == buildingLowerAngle.PlayerID)
-                            {
-                                if (buildingUpperAngle.PlayerID == currentPlayerID)
-                                    tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
-                                else
-                                    tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
                             }
 
                             break;
                         case DataStruct.BuildTypes.HYPERLOOP:
                             tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+
                             break;
                     }
                 }
             }
+        }
+
+        private void ComputeGameRules(short currentPlayerID)
+        {
+            if (!CanSetStructCity() && !CanSetStructOutpost())
+                checkAngles();
+
+            if (CanSetStructHyperloop())
+                checkEdges();
         }
     }
 }

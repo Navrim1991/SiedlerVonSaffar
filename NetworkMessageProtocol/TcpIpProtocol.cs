@@ -8,7 +8,7 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
 {
     public class TcpIpProtocol
     {
-        private const int TCP_IP_PROTOCOL_DATA_PATTERN = 0x00000F01;
+        private const int TCP_IP_PROTOCOL_DATA_PATTERN = 0x00000F00;
 
         public bool isClientDataPattern(byte[] data)
         {
@@ -24,8 +24,7 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
 
             byte[] clientDataProtocol = { data[0], data[1], 0 , 0 };
 
-            return (BitConverter.ToInt32(clientDataProtocol, 0) == TCP_IP_PROTOCOL_DATA_PATTERN) ? true : false;
-            
+            return (BitConverter.ToInt32(clientDataProtocol, 0) == TCP_IP_PROTOCOL_DATA_PATTERN) ? true : false;            
         }
     }
 }

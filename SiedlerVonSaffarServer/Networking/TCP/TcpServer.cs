@@ -56,8 +56,6 @@ namespace SiedlerVonSaffar.Networking.TCP
 
                 Configuration.DeveloperParameter.PrintDebug("TCP server started\n\r\tWaiting for TCP Connections");
 
-                gameLogic.RxQueue.Enqueue(new NetworkMessageProtocol.SocketStateObject());
-
                 while (connectionCount < ServerConfig.MAX_CONNECTIONS)
                 {
                     Socket acceptedConnection = listener.Accept();
@@ -102,7 +100,7 @@ namespace SiedlerVonSaffar.Networking.TCP
                 {
                     byte[] equalBytes = { state.buffer[0], state.buffer[1], state.buffer[2], state.buffer[3] };
 
-                    if (CLIENT_DATA_TURN.SequenceEqual(equalBytes))
+                    if (PLAYER_TURN.SequenceEqual(equalBytes))
                     {
                         List<Socket> connectionsToSendData = (from p in connections where p.RemoteEndPoint != handler.RemoteEndPoint select p).ToList<Socket>();
 
