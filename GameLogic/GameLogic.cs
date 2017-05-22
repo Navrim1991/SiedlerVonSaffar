@@ -26,6 +26,12 @@ namespace SiedlerVonSaffar.GameLogic
         private Thread gameLogicThread;
         private TcpIpProtocol tcpProtocol;
 
+        private List<GameObjects.Menu.Cards.Resources.Biomass> ResourceCardsBiomass { get; set; }
+        private List<GameObjects.Menu.Cards.Resources.CarbonFibres> ResourceCardsCarbonFibres { get; set; }
+        private List<GameObjects.Menu.Cards.Resources.Deuterium> ResourceCardsDeuterium { get; set; }
+        private List<GameObjects.Menu.Cards.Resources.FriendlyAlien> ResourceCardsFriendlyAlien { get; set; }
+        private List<GameObjects.Menu.Cards.Resources.Titan> ResourceCardsTitan { get; set; }
+
         public short PlayersReady { get; set; }
         public bool GameHasStarted { get; set; }
 
@@ -44,6 +50,13 @@ namespace SiedlerVonSaffar.GameLogic
             gameLogicThread = new Thread(gameLogicThreadStart);
             gameLogicThread.Name = "GameLogic";
             tcpProtocol = new TcpIpProtocol();
+
+            this.ResourceCardsBiomass = new List<GameObjects.Menu.Cards.Resources.Biomass>();
+            this.ResourceCardsCarbonFibres = new List<GameObjects.Menu.Cards.Resources.CarbonFibres>();
+            this.ResourceCardsDeuterium = new List<GameObjects.Menu.Cards.Resources.Deuterium>();
+            this.ResourceCardsFriendlyAlien = new List<GameObjects.Menu.Cards.Resources.FriendlyAlien>();
+            this.ResourceCardsTitan = new List<GameObjects.Menu.Cards.Resources.Titan>();
+
             gameLogicThread.Start();
         }
 
@@ -104,28 +117,28 @@ namespace SiedlerVonSaffar.GameLogic
 
         private void HandleDeal(byte[] dealData)
         {
-            byte[] firstCard = new byte[(dealData.Length - 4) / 2];
-            byte[] secondCard = new byte[(dealData.Length - 4) / 2];
+            byte[] palyerCard = new byte[(dealData.Length - 4) / 2];
+            byte[] serverCard = new byte[(dealData.Length - 4) / 2];
 
-            for(int i = 0; i < firstCard.Length; i++)
+            for(int i = 0; i < palyerCard.Length; i++)
             {
-                firstCard[i] = dealData[i + 4];
+                palyerCard[i] = dealData[i + 4];
             }
 
-            for (int i = 0; i < secondCard.Length; i++)
+            for (int i = 0; i < serverCard.Length; i++)
             {
-                secondCard[i] = dealData[i + ((dealData.Length - 4) / 2)];
+                serverCard[i] = dealData[i + ((dealData.Length - 4) / 2)];
             }
 
-            MemoryStream stream = new MemoryStream(firstCard);
+            MemoryStream stream = new MemoryStream(palyerCard);
 
             IFormatter formatter = new BinaryFormatter();
 
-            GameObjects.Menu.Cards.Resources.ResourceCard resourceCard_One = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
+            GameObjects.Menu.Cards.Resources.ResourceCard resourceCardPlayer = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
 
-            stream = new MemoryStream(secondCard);
+            stream = new MemoryStream(serverCard);
 
-            GameObjects.Menu.Cards.Resources.ResourceCard resourceCard_Two = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
+            GameObjects.Menu.Cards.Resources.ResourceCard resourceCardServer = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
 
             short dealRelation = 4;
 
@@ -155,7 +168,7 @@ namespace SiedlerVonSaffar.GameLogic
 
                 if(upperAngleBuilding != null && upperAngleBuilding.PlayerID == currentPlayer.Value.PlayerID)
                 {
-                    if(element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCard_One.GetType())
+                    if(element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.GetType())
                     {
                         dealRelation = 2;
                         break;
@@ -166,7 +179,7 @@ namespace SiedlerVonSaffar.GameLogic
 
                 if (lowerAngleBuilding != null && lowerAngleBuilding.PlayerID == currentPlayer.Value.PlayerID)
                 {
-                    if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCard_One.Resource.GetType())
+                    if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.Resource.GetType())
                     {
                         dealRelation = 2;
                         break;
@@ -179,42 +192,101 @@ namespace SiedlerVonSaffar.GameLogic
 
             bool canDeal = false;
 
-            if(resourceCard_One is GameObjects.Menu.Cards.Resources.Biomass)
+            if(resourceCardPlayer is GameObjects.Menu.Cards.Resources.Biomass)
             {
                 if (currentPlayer.Value.ResourceCardsBiomass.Count >= dealRelation)
+                {
                     canDeal = true;
+
+                    for(int i = 0; i < dealRelation; i++)
+                    {
+                        currentPlayer.Value.ResourceCardsBiomass.Remove(currentPlayer.Value.ResourceCardsBiomass.First());
+                        ResourceCardsBiomass.Add(new GameObjects.Menu.Cards.Resources.Biomass(null));
+                    }
+                }
+                    
             }
-            else if (resourceCard_One is GameObjects.Menu.Cards.Resources.CarbonFibres)
+            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.CarbonFibres)
             {
                 if (currentPlayer.Value.ResourceCardsCarbonFibres.Count >= dealRelation)
+                {
+                    canDeal = true;
+
+                    for (int i = 0; i < dealRelation; i++)
+                    {
+                        currentPlayer.Value.ResourceCardsCarbonFibres.Remove(currentPlayer.Value.ResourceCardsCarbonFibres.First());
+                        ResourceCardsCarbonFibres.Add(new GameObjects.Menu.Cards.Resources.CarbonFibres(null));
+                    }
+                }
                     canDeal = true;
             }
-            else if (resourceCard_One is GameObjects.Menu.Cards.Resources.Deuterium)
+            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Deuterium)
             {
                 if (currentPlayer.Value.ResourceCardsDeuterium.Count >= dealRelation)
+                {
                     canDeal = true;
+
+                    for (int i = 0; i < dealRelation; i++)
+                    {
+                        currentPlayer.Value.ResourceCardsDeuterium.Remove(currentPlayer.Value.ResourceCardsDeuterium.First());
+                        ResourceCardsDeuterium.Add(new GameObjects.Menu.Cards.Resources.Deuterium(null));
+                    }
+                }
             }
-            else if (resourceCard_One is GameObjects.Menu.Cards.Resources.FriendlyAlien)
+            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.FriendlyAlien)
             {
                 if (currentPlayer.Value.ResourceCardsFriendlyAlien.Count >= dealRelation)
+                {
                     canDeal = true;
+
+                    for (int i = 0; i < dealRelation; i++)
+                    {
+                        currentPlayer.Value.ResourceCardsFriendlyAlien.Remove(currentPlayer.Value.ResourceCardsFriendlyAlien.First());
+                        ResourceCardsFriendlyAlien.Add(new GameObjects.Menu.Cards.Resources.FriendlyAlien(null));
+                    }
+                }
             }
-            else if (resourceCard_One is GameObjects.Menu.Cards.Resources.Titan)
+            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Titan)
             {
                 if (currentPlayer.Value.ResourceCardsTitan.Count >= dealRelation)
+                {
                     canDeal = true;
+
+                    for (int i = 0; i < dealRelation; i++)
+                    {
+                        currentPlayer.Value.ResourceCardsTitan.Remove(currentPlayer.Value.ResourceCardsTitan.First());
+                        ResourceCardsTitan.Add(new GameObjects.Menu.Cards.Resources.Titan(null));
+                    }
+                }
             }
 
             if(canDeal)
             {
-                byte[] data = new byte[secondCard.Length + tcpProtocol.SERVER_GIVE_RESOURCES.Length];
+                
+
+                stream = new MemoryStream();
+                formatter = new BinaryFormatter();
+                formatter.Serialize(stream, currentPlayer.Value);
+
+                byte[] data = new byte[stream.GetBuffer().Length + tcpProtocol.SERVER_PLAYER_DATA.Length];
+
+                data.SetValue(tcpProtocol.SERVER_PLAYER_DATA, 0);
+                data.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_PLAYER_DATA.Length + 1);
+
+                SocketStateObject state = new SocketStateObject();
+                state.buffer = data;
+                state.WorkSocket = currentPlayer.Key;
+
+                TxQueue.Enqueue(state);
+
+                //TODO: send playerProxy to other players
+
+                data = new byte[serverCard.Length + tcpProtocol.SERVER_GIVE_RESOURCES.Length];
 
                 data.SetValue(tcpProtocol.SERVER_GIVE_RESOURCES, 0);
-                data.SetValue(secondCard, tcpProtocol.SERVER_GIVE_RESOURCES.Length + 1);
+                data.SetValue(serverCard, tcpProtocol.SERVER_GIVE_RESOURCES.Length + 1);
 
-                //TODO: 1. SpielkartenStack 2.Spielkartenstack/SpielerSpielkarten aktulaiesieren 3.Spielerdaten loschicken
-
-                NetworkMessageProtocol.SocketStateObject state = new SocketStateObject();
+                state = new SocketStateObject();
                 state.buffer = data;
                 state.WorkSocket = currentPlayer.Key;
 
