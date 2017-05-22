@@ -91,6 +91,7 @@ namespace SiedlerVonSaffar.GameLogic
 
             GameObjects.Player.Player player = (GameObjects.Player.Player)formatter.Deserialize(stream);
 
+            //TODO nicht richtig muss anders implemtiert werden
             if (!Players.ContainsValue(player))
             {                
                 Players.Add(socket, player);
@@ -276,21 +277,6 @@ namespace SiedlerVonSaffar.GameLogic
                 state.WorkSocket = currentPlayer.Key;
 
                 TxQueue.Enqueue(state);
-
-                //TODO: send playerProxy to other players
-
-                /*
-                Glaube ich ist nicht notwendig
-                data = new byte[serverCard.Length + tcpProtocol.SERVER_GIVE_RESOURCES.Length];
-
-                data.SetValue(tcpProtocol.SERVER_GIVE_RESOURCES, 0);
-                data.SetValue(serverCard, tcpProtocol.SERVER_GIVE_RESOURCES.Length + 1);
-
-                state = new SocketStateObject();
-                state.buffer = data;
-                state.WorkSocket = currentPlayer.Key;
-
-                TxQueue.Enqueue(state);*/
             }
             else
             {
@@ -728,7 +714,7 @@ namespace SiedlerVonSaffar.GameLogic
 
         private void ComputeGameRules()
         {
-            if (!CanSetStructCity() && !CanSetStructOutpost())
+            if (CanSetStructCity() && CanSetStructOutpost())
                 checkAngles();
 
             if (CanSetStructHyperloop())
