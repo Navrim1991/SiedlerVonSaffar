@@ -72,7 +72,7 @@ namespace SiedlerVonSaffar.GameLogic
         {
             MemoryStream stream = new MemoryStream(playerData);
 
-            stream.Seek(5, SeekOrigin.Begin);
+            stream.Seek(5, SeekOrigin.End);
 
             IFormatter formatter = new BinaryFormatter();
 
@@ -85,7 +85,7 @@ namespace SiedlerVonSaffar.GameLogic
             else
             {
                 Players[socket] = player;
-                //send playerSecureProxy to other players;
+                //TODO: send playerSecureProxy to other players;
             }
         }
 
@@ -93,13 +93,142 @@ namespace SiedlerVonSaffar.GameLogic
         {
             MemoryStream stream = new MemoryStream(containerData);
 
-            stream.Seek(5, SeekOrigin.Begin);
+            stream.Seek(5, SeekOrigin.End);
 
             IFormatter formatter = new BinaryFormatter();
 
             DataStruct.Container dataContainer = (DataStruct.Container)formatter.Deserialize(stream);
 
             this.dataContainer = dataContainer;
+        }
+
+        private void HandleDeal(byte[] dealData)
+        {
+            byte[] firstCard = new byte[(dealData.Length - 4) / 2];
+            byte[] secondCard = new byte[(dealData.Length - 4) / 2];
+
+            for(int i = 0; i < firstCard.Length; i++)
+            {
+                firstCard[i] = dealData[i + 4];
+            }
+
+            for (int i = 0; i < secondCard.Length; i++)
+            {
+                secondCard[i] = dealData[i + ((dealData.Length - 4) / 2)];
+            }
+
+            MemoryStream stream = new MemoryStream(firstCard);
+
+            IFormatter formatter = new BinaryFormatter();
+
+            GameObjects.Menu.Cards.Resources.ResourceCard resourceCard_One = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
+
+            stream = new MemoryStream(secondCard);
+
+            GameObjects.Menu.Cards.Resources.ResourceCard resourceCard_Two = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
+
+            short dealRelation = 4;
+
+            GameObjects.Buildings.Building upperAngleBuilding;
+            GameObjects.Buildings.Building lowerAngleBuilding;
+
+            foreach (DataStruct.Harbor element in dataContainer.Harbors)
+            {
+                upperAngleBuilding = null;
+                lowerAngleBuilding = null;
+
+                if (element.UpperAngel.BuildTyp != DataStruct.BuildTypes.NONE)
+                {
+                    if (element.UpperAngel.BuildTyp == DataStruct.BuildTypes.CITY)
+                        upperAngleBuilding = (GameObjects.Buildings.City)element.UpperAngel.Data;
+                    else
+                        upperAngleBuilding = (GameObjects.Buildings.Outpost)element.UpperAngel.Data;
+                }
+
+                if (element.LowerAngel.Data != null)
+                {
+                    if (element.LowerAngel.BuildTyp == DataStruct.BuildTypes.CITY)
+                        lowerAngleBuilding = (GameObjects.Buildings.City)element.UpperAngel.Data;
+                    else
+                        lowerAngleBuilding = (GameObjects.Buildings.Outpost)element.UpperAngel.Data;
+                }
+
+                if(upperAngleBuilding != null && upperAngleBuilding.PlayerID == currentPlayer.Value.PlayerID)
+                {
+                    if(element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCard_One.GetType())
+                    {
+                        dealRelation = 2;
+                        break;
+                    }
+                    else
+                        dealRelation = 3;
+                }
+
+                if (lowerAngleBuilding != null && lowerAngleBuilding.PlayerID == currentPlayer.Value.PlayerID)
+                {
+                    if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCard_One.Resource.GetType())
+                    {
+                        dealRelation = 2;
+                        break;
+                    }
+                    else
+                        dealRelation = 3;
+                }
+
+            }
+
+            bool canDeal = false;
+
+            if(resourceCard_One is GameObjects.Menu.Cards.Resources.Biomass)
+            {
+                if (currentPlayer.Value.ResourceCardsBiomass.Count >= dealRelation)
+                    canDeal = true;
+            }
+            else if (resourceCard_One is GameObjects.Menu.Cards.Resources.CarbonFibres)
+            {
+                if (currentPlayer.Value.ResourceCardsCarbonFibres.Count >= dealRelation)
+                    canDeal = true;
+            }
+            else if (resourceCard_One is GameObjects.Menu.Cards.Resources.Deuterium)
+            {
+                if (currentPlayer.Value.ResourceCardsDeuterium.Count >= dealRelation)
+                    canDeal = true;
+            }
+            else if (resourceCard_One is GameObjects.Menu.Cards.Resources.FriendlyAlien)
+            {
+                if (currentPlayer.Value.ResourceCardsFriendlyAlien.Count >= dealRelation)
+                    canDeal = true;
+            }
+            else if (resourceCard_One is GameObjects.Menu.Cards.Resources.Titan)
+            {
+                if (currentPlayer.Value.ResourceCardsTitan.Count >= dealRelation)
+                    canDeal = true;
+            }
+
+            if(canDeal)
+            {
+                byte[] data = new byte[secondCard.Length + tcpProtocol.SERVER_GIVE_RESOURCES.Length];
+
+                data.SetValue(tcpProtocol.SERVER_GIVE_RESOURCES, 0);
+                data.SetValue(secondCard, tcpProtocol.SERVER_GIVE_RESOURCES.Length + 1);
+
+                //TODO: 1. SpielkartenStack 2.Spielkartenstack/SpielerSpielkarten aktulaiesieren 3.Spielerdaten loschicken
+
+                NetworkMessageProtocol.SocketStateObject state = new SocketStateObject();
+                state.buffer = data;
+                state.WorkSocket = currentPlayer.Key;
+
+                TxQueue.Enqueue(state);
+            }
+            else
+            {
+                NetworkMessageProtocol.SocketStateObject state = new SocketStateObject();
+                state.buffer = tcpProtocol.SERVER_CANT_GIVE_RESOURCES;
+                state.WorkSocket = currentPlayer.Key;
+
+                TxQueue.Enqueue(state);
+            }
+
         }
 
         private void Start()
@@ -153,8 +282,7 @@ namespace SiedlerVonSaffar.GameLogic
                         }
                         else if (tcpProtocol.PLAYER_DEAL.SequenceEqual(equalBytes))
                         {
-                            //TODO: erste byteHälfte was er bietet zweite was er will;
-                            //Spieler möchte handeln
+                            HandleDeal(state.buffer);
                         }
                         else if (tcpProtocol.PLAYER_ROLL_DICE.SequenceEqual(equalBytes))
                         {

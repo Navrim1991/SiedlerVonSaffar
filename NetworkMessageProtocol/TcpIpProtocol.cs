@@ -19,7 +19,9 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
         public readonly byte[] SERVER_CREATE_GAME;
         public readonly byte[] SERVER_DATA;
         public readonly byte[] SERVER_GIVE_RESOURCES;
+        public readonly byte[] SERVER_CANT_GIVE_RESOURCES;
         public readonly byte[] SERVER_CHANGE_BANDIT;
+        public readonly byte[] SERVER_PLAYER_DATA;
 
         public TcpIpProtocol(){
             PLAYER_TURN = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_TURN);
@@ -31,7 +33,9 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
             SERVER_CREATE_GAME = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_CREATE_GAME);
             SERVER_DATA = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_DATA);
             SERVER_GIVE_RESOURCES = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_GIVE_RESOURCES);
+            SERVER_CANT_GIVE_RESOURCES = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_CANT_GIVE_RESOURCES);
             SERVER_CHANGE_BANDIT = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_CHANGE_BANDIT);
+            SERVER_PLAYER_DATA = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_PLAYER_DATA);
         }
 
         public bool isClientDataPattern(byte[] data)
