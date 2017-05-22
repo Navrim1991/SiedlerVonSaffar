@@ -176,18 +176,19 @@ namespace SiedlerVonSaffar.GameLogic
                     else
                         dealRelation = 3;
                 }
-
-                if (lowerAngleBuilding != null && lowerAngleBuilding.PlayerID == currentPlayer.Value.PlayerID)
+                if(dealRelation > 2)
                 {
-                    if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.Resource.GetType())
+                    if (lowerAngleBuilding != null && lowerAngleBuilding.PlayerID == currentPlayer.Value.PlayerID)
                     {
-                        dealRelation = 2;
-                        break;
+                        if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.Resource.GetType())
+                        {
+                            dealRelation = 2;
+                            break;
+                        }
+                        else
+                            dealRelation = 3;
                     }
-                    else
-                        dealRelation = 3;
-                }
-
+                }              
             }
 
             bool canDeal = false;
@@ -218,7 +219,6 @@ namespace SiedlerVonSaffar.GameLogic
                         ResourceCardsCarbonFibres.Add(new GameObjects.Menu.Cards.Resources.CarbonFibres(null));
                     }
                 }
-                    canDeal = true;
             }
             else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Deuterium)
             {
@@ -261,9 +261,7 @@ namespace SiedlerVonSaffar.GameLogic
             }
 
             if(canDeal)
-            {
-                
-
+            { 
                 stream = new MemoryStream();
                 formatter = new BinaryFormatter();
                 formatter.Serialize(stream, currentPlayer.Value);
@@ -281,6 +279,8 @@ namespace SiedlerVonSaffar.GameLogic
 
                 //TODO: send playerProxy to other players
 
+                /*
+                Glaube ich ist nicht notwendig
                 data = new byte[serverCard.Length + tcpProtocol.SERVER_GIVE_RESOURCES.Length];
 
                 data.SetValue(tcpProtocol.SERVER_GIVE_RESOURCES, 0);
@@ -290,17 +290,155 @@ namespace SiedlerVonSaffar.GameLogic
                 state.buffer = data;
                 state.WorkSocket = currentPlayer.Key;
 
-                TxQueue.Enqueue(state);
+                TxQueue.Enqueue(state);*/
             }
             else
             {
-                NetworkMessageProtocol.SocketStateObject state = new SocketStateObject();
+                SocketStateObject state = new SocketStateObject();
                 state.buffer = tcpProtocol.SERVER_CANT_GIVE_RESOURCES;
                 state.WorkSocket = currentPlayer.Key;
 
                 TxQueue.Enqueue(state);
             }
 
+        }
+
+        private void HandleRollDice(byte[] data)
+        {
+            byte[] diceOne = new byte[(data.Length - 4) / 2];
+            byte[] diceTwo = new byte[(data.Length - 4) / 2];
+
+            for (int i = 0; i < diceOne.Length; i++)
+            {
+                diceOne[i] = data[i + 4];
+            }
+
+            for (int i = 0; i < diceTwo.Length; i++)
+            {
+                diceTwo[i] = data[i + ((data.Length - 4) / 2)];
+            }
+
+            MemoryStream stream = new MemoryStream(diceOne);
+
+            IFormatter formatter = new BinaryFormatter();
+
+            int valueDiceOne = (int)formatter.Deserialize(stream);
+
+            stream = new MemoryStream(diceTwo);
+
+            int valueDiceTwo = (int)formatter.Deserialize(stream);
+
+            List<DataStruct.Hexagon> hexagons = new List<DataStruct.Hexagon>();
+
+            for(int i = 0; i < dataContainer.Hexagons.GetLength(0); i++)
+            {
+                for (int j = 0; j < dataContainer.Hexagons.GetLength(1); j++)
+                {
+                    if (dataContainer.Hexagons[i, j].HexagonID == (valueDiceOne + valueDiceTwo))
+                        hexagons.Add(dataContainer.Hexagons[i, j]);
+                }
+            }
+
+            foreach(DataStruct.Hexagon element in hexagons)
+            {
+                foreach(DataStruct.Angle innerElement in element.Angles)
+                {
+                    if (innerElement.Data != null)
+                    {
+                        GameObjects.Buildings.Building building = null;
+
+                        if (innerElement.BuildTyp == DataStruct.BuildTypes.CITY)
+                            building = (GameObjects.Buildings.City)innerElement.Data;
+                        else
+                            building = (GameObjects.Buildings.Outpost)innerElement.Data;
+
+                        foreach (KeyValuePair<Socket, GameObjects.Player.Player> playerElement in Players)
+                        {
+                            if(playerElement.Value.PlayerID == building.PlayerID)
+                            {
+                                int countResources = 1;
+
+                                if (innerElement.BuildTyp == DataStruct.BuildTypes.CITY)
+                                    countResources++;
+                               
+                                if(element.Data is GameObjects.GameField.BiomassFactory)
+                                {
+                                    if(countResources <= ResourceCardsBiomass.Count)
+                                    {
+                                        for (int i = 0; i < countResources; i++)
+                                        {
+                                            ResourceCardsBiomass.RemoveAt(0);
+                                            playerElement.Value.ResourceCardsBiomass.Add(new GameObjects.Menu.Cards.Resources.Biomass(null));
+                                        }
+                                    }                              
+                                }
+                                else if (element.Data is GameObjects.GameField.CoalMine)
+                                {
+                                    if (countResources <= ResourceCardsCarbonFibres.Count)
+                                    {
+                                        for (int i = 0; i < countResources; i++)
+                                        {
+                                            ResourceCardsCarbonFibres.RemoveAt(0);
+                                            playerElement.Value.ResourceCardsCarbonFibres.Add(new GameObjects.Menu.Cards.Resources.CarbonFibres(null));
+                                        }
+                                    }
+                                }
+                                else if (element.Data is GameObjects.GameField.DeuteriumGasField)
+                                {
+                                    if (countResources <= ResourceCardsDeuterium.Count)
+                                    {
+                                        for (int i = 0; i < countResources; i++)
+                                        {
+                                            ResourceCardsDeuterium.RemoveAt(0);
+                                            playerElement.Value.ResourceCardsDeuterium.Add(new GameObjects.Menu.Cards.Resources.Deuterium(null));
+                                        }
+                                    }   
+                                }
+                                else if (element.Data is GameObjects.GameField.FriendlyAlien)
+                                {
+                                    if (countResources <= ResourceCardsFriendlyAlien.Count)
+                                    {
+                                        for (int i = 0; i < countResources; i++)
+                                        {
+                                            ResourceCardsFriendlyAlien.RemoveAt(0);
+                                            playerElement.Value.ResourceCardsFriendlyAlien.Add(new GameObjects.Menu.Cards.Resources.FriendlyAlien(null));
+                                        }
+                                    }
+                                }
+                                else if (element.Data is GameObjects.GameField.TitanMine)
+                                {
+                                    if (countResources <= ResourceCardsFriendlyAlien.Count)
+                                    {
+                                        for (int i = 0; i < countResources; i++)
+                                        {
+                                            ResourceCardsTitan.RemoveAt(0);
+                                            playerElement.Value.ResourceCardsTitan.Add(new GameObjects.Menu.Cards.Resources.Titan(null));
+                                        }
+                                    }                                   
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            foreach (KeyValuePair<Socket, GameObjects.Player.Player> playerElement in Players)
+            {
+                stream = new MemoryStream();
+                formatter = new BinaryFormatter();
+                formatter.Serialize(stream, currentPlayer.Value);
+
+                byte[] playerData = new byte[stream.GetBuffer().Length + tcpProtocol.SERVER_PLAYER_DATA.Length];
+
+                data.SetValue(tcpProtocol.SERVER_PLAYER_DATA, 0);
+                data.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_PLAYER_DATA.Length + 1);
+
+                SocketStateObject state = new SocketStateObject();
+                state.buffer = playerData;
+                state.WorkSocket = currentPlayer.Key;
+
+                TxQueue.Enqueue(state);
+            }
         }
 
         private void Start()
@@ -358,8 +496,7 @@ namespace SiedlerVonSaffar.GameLogic
                         }
                         else if (tcpProtocol.PLAYER_ROLL_DICE.SequenceEqual(equalBytes))
                         {
-                            //Zahlen in erste und zweite hälfte aufgeteilt
-                            //spieler hat gewürfelt
+                            HandleRollDice(state.buffer);
                         }
                         else if (tcpProtocol.PLAYER_PLAY_PROGRESSCARD.SequenceEqual(equalBytes))
                         {
