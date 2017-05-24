@@ -570,7 +570,7 @@ namespace SiedlerVonSaffar.GameLogic
                 playerData.SetValue(tcpProtocol.SERVER_PLAYER_DATA, 0);
                 playerData.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_PLAYER_DATA.Length + 1);
 
-                TxQueue.Enqueue(new TransmitMessage(playerData, TransmitMessage.TransmitTyps.TO_ALL));
+                TxQueue.Enqueue(new TransmitMessage(playerData));
             }
             else
             {
@@ -694,7 +694,7 @@ namespace SiedlerVonSaffar.GameLogic
                 playerData.SetValue(tcpProtocol.SERVER_PLAYER_DATA, 0);
                 playerData.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_PLAYER_DATA.Length + 1);
 
-                TxQueue.Enqueue(new TransmitMessage(playerData, TransmitMessage.TransmitTyps.TO_ALL));
+                TxQueue.Enqueue(new TransmitMessage(playerData));
             }
         }
 
@@ -713,12 +713,19 @@ namespace SiedlerVonSaffar.GameLogic
             IFormatter formatter = new BinaryFormatter();
             formatter.Serialize(stream, containerData);
 
-            byte[] data = new byte[stream.GetBuffer().Length + tcpProtocol.SERVER_CONTAINER_DATA.Length];
+            byte[] data = new byte[stream.GetBuffer().Length + tcpProtocol.SERVER_CONTAINER_DATA_OWN.Length];
 
-            data.SetValue(tcpProtocol.SERVER_CONTAINER_DATA, 0);
-            data.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_CONTAINER_DATA.Length + 1);
+            data.SetValue(tcpProtocol.SERVER_CONTAINER_DATA_OWN, 0);
+            data.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_CONTAINER_DATA_OWN.Length + 1);
 
             TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
+
+            data = new byte[stream.GetBuffer().Length + tcpProtocol.SERVER_CONTAINER_DATA_OTHER.Length];
+
+            data.SetValue(tcpProtocol.SERVER_CONTAINER_DATA_OWN, 0);
+            data.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_CONTAINER_DATA_OWN.Length + 1);
+
+            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
         }
 
         #endregion
@@ -855,19 +862,19 @@ namespace SiedlerVonSaffar.GameLogic
                     {
                         case GameStage.GameStages.FOUNDATION_STAGE:
 
-                            if (rxObject is SocketStateObject)
+                            if (rxObject is RecieveMessage)
                             {
-                                SocketStateObject state = (SocketStateObject)rxObject;
+                                RecieveMessage message = (RecieveMessage)rxObject;
 
-                                if (tcpProtocol.isClientDataPattern(state.buffer))
+                                if (tcpProtocol.isClientDataPattern(message.Data))
                                 {
-                                    byte[] equalBytes = { state.buffer[0], state.buffer[1], state.buffer[2], state.buffer[3] };
+                                    byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
 
                                     if (tcpProtocol.PLAYER_NAME.SequenceEqual(equalBytes))
                                     {
-                                        string playerName = HandlePlayerName(state.buffer);
+                                        string playerName = HandlePlayerName(message.Data);
                                         //TODO FARBE SETZEN
-                                        GameObjects.Player.Player tmpPlayer = new GameObjects.Player.Player(playerName, (short)(Players.Count + 1), (IPEndPoint)state.WorkSocket.RemoteEndPoint);                                        
+                                        GameObjects.Player.Player tmpPlayer = new GameObjects.Player.Player(playerName, (short)(Players.Count + 1), message.ClientIP);                                        
 
                                         for(int i = 0; i < 4; i++)
                                             tmpPlayer.Cities.Add(new GameObjects.Buildings.City(tmpPlayer.PlayerID));
@@ -898,23 +905,23 @@ namespace SiedlerVonSaffar.GameLogic
 
                             if (Players.Count == PlayersReady)
                             {
-                                TxQueue.Enqueue(new TransmitMessage(tcpProtocol.SERVER_STAGE_FOUNDATION_ROLL_DICE, TransmitMessage.TransmitTyps.TO_OWN));
+                                TxQueue.Enqueue(new TransmitMessage(tcpProtocol.SERVER_STAGE_FOUNDATION_ROLL_DICE));
                                 gameStage = GameStage.GameStages.FOUNDATION_STAGE_ROLLING_DICE;
                             }                                
 
                             break;
                         case GameStage.GameStages.FOUNDATION_STAGE_ROLLING_DICE:
-                            if (rxObject is SocketStateObject)
+                            if (rxObject is RecieveMessage)
                             {
-                                SocketStateObject state = (SocketStateObject)rxObject;
+                                RecieveMessage message = (RecieveMessage)rxObject;
 
-                                if (tcpProtocol.isClientDataPattern(state.buffer))
+                                if (tcpProtocol.isClientDataPattern(message.Data))
                                 {
-                                    byte[] equalBytes = { state.buffer[0], state.buffer[1], state.buffer[2], state.buffer[3] };
+                                    byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
 
                                     if (tcpProtocol.PLAYER_STAGE_FOUNDATION_ROLL_DICE.SequenceEqual(equalBytes))
                                     {
-                                        int number = HandleRollDice(state.buffer);
+                                        int number = HandleRollDice(message.Data);
 
                                         diceRolled++;
 
@@ -926,7 +933,7 @@ namespace SiedlerVonSaffar.GameLogic
                                             {
                                                 GameObjects.Player.Player tmp = Players.Peek();
 
-                                                if (tmp.ClientIP == (IPEndPoint)state.WorkSocket.RemoteEndPoint)
+                                                if (tmp.ClientIP == message.ClientIP)
                                                 {
                                                     currentPlayer = tmp;
                                                     break;
@@ -957,17 +964,17 @@ namespace SiedlerVonSaffar.GameLogic
                             
                             break;
                         case GameStage.GameStages.FOUNDATION_STAGE_ROUND_ONE:
-                            if (rxObject is SocketStateObject)
+                            if (rxObject is RecieveMessage)
                             {
-                                SocketStateObject state = (SocketStateObject)rxObject;
+                                RecieveMessage message = (RecieveMessage)rxObject;
 
-                                if (tcpProtocol.isClientDataPattern(state.buffer))
+                                if (tcpProtocol.isClientDataPattern(message.Data))
                                 {
-                                    byte[] equalBytes = { state.buffer[0], state.buffer[1], state.buffer[2], state.buffer[3] };
+                                    byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
 
                                     if (tcpProtocol.PLAYER_CONTAINER_DATA.SequenceEqual(equalBytes))
                                     {
-                                        HandelContainerData(state.buffer);
+                                        HandelContainerData(message.Data);
 
                                         foundationStageRoundCounter++;
                                     }
@@ -1007,17 +1014,17 @@ namespace SiedlerVonSaffar.GameLogic
 
                             break;
                         case GameStage.GameStages.FOUNDATION_STAGE_ROUND_TWO:
-                            if (rxObject is SocketStateObject)
+                            if (rxObject is RecieveMessage)
                             {
-                                SocketStateObject state = (SocketStateObject)rxObject;
+                                RecieveMessage message = (RecieveMessage)rxObject;
 
-                                if (tcpProtocol.isClientDataPattern(state.buffer))
+                                if (tcpProtocol.isClientDataPattern(message.Data))
                                 {
-                                    byte[] equalBytes = { state.buffer[0], state.buffer[1], state.buffer[2], state.buffer[3] };
+                                    byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
 
                                     if (tcpProtocol.PLAYER_CONTAINER_DATA.SequenceEqual(equalBytes))
                                     {
-                                        HandelContainerData(state.buffer);
+                                        HandelContainerData(message.Data);
 
                                         foundationStageRoundCounter++;
                                     }
@@ -1065,26 +1072,85 @@ namespace SiedlerVonSaffar.GameLogic
                             }
                             break;
                         case GameStage.GameStages.NONE:
-                            TxQueue.Enqueue(new TransmitMessage(tcpProtocol.SERVER_NEED_PLAYER_NAME, TransmitMessage.TransmitTyps.TO_ALL));
+                            TxQueue.Enqueue(new TransmitMessage(tcpProtocol.SERVER_NEED_PLAYER_NAME));
                             gameStage = GameStage.GameStages.FOUNDATION_STAGE;
                             break;
                         case GameStage.GameStages.PLAYER_STAGE_BUILD:
+                            if (rxObject is RecieveMessage)
+                            {
+                                RecieveMessage message = (RecieveMessage)rxObject;
+
+                                if (tcpProtocol.isClientDataPattern(message.Data))
+                                {
+                                    byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
+
+                                    if (tcpProtocol.PLAYER_CONTAINER_DATA.SequenceEqual(equalBytes))
+                                    {
+                                        HandelContainerData(message.Data);
+
+                                        ComputeGameRules();
+
+                                        HandelContainerData();
+                                    }
+                                    else if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
+                                    {
+                                        nextPlayer();
+
+                                        ComputeGameRules();
+
+                                        HandelContainerData();
+
+                                        gameStage = GameStage.GameStages.PLAYER_STAGE_ROLL_DICE;
+                                    }
+                                }
+                            }
+
                             break;
                         case GameStage.GameStages.PLAYER_STAGE_DEAL:
-                            //HandleDeal(state)
-                            break;
-                        case GameStage.GameStages.PLAYER_STAGE_ROLL_DICE:
-                            if (rxObject is SocketStateObject)
+                            
+                            if (rxObject is RecieveMessage)
                             {
-                                SocketStateObject state = (SocketStateObject)rxObject;
+                                RecieveMessage message = (RecieveMessage)rxObject;
 
-                                if (tcpProtocol.isClientDataPattern(state.buffer))
+                                if (tcpProtocol.isClientDataPattern(message.Data))
                                 {
-                                    byte[] equalBytes = { state.buffer[0], state.buffer[1], state.buffer[2], state.buffer[3] };
+                                    byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
+
+                                    if (tcpProtocol.PLAYER_DEAL.SequenceEqual(equalBytes))
+                                    {
+                                        HandleDeal(message.Data);
+                                    }
+                                    else if (tcpProtocol.PLAYER_CONTAINER_DATA.SequenceEqual(equalBytes))
+                                    {
+                                        HandelContainerData(message.Data);
+
+                                        gameStage = GameStage.GameStages.PLAYER_STAGE_BUILD;
+                                    }
+                                    else if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
+                                    {
+                                        nextPlayer();
+
+                                        ComputeGameRules();
+
+                                        HandelContainerData();
+
+                                        gameStage = GameStage.GameStages.PLAYER_STAGE_ROLL_DICE;
+                                    }
+                                }
+                            }
+                                        break;
+                        case GameStage.GameStages.PLAYER_STAGE_ROLL_DICE:
+                            if (rxObject is RecieveMessage)
+                            {
+                                RecieveMessage message = (RecieveMessage)rxObject;
+
+                                if (tcpProtocol.isClientDataPattern(message.Data))
+                                {
+                                    byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
 
                                     if (tcpProtocol.PLAYER_ROLL_DICE.SequenceEqual(equalBytes))
                                     {
-                                        int number = HandleRollDice(state.buffer);
+                                        int number = HandleRollDice(message.Data);
 
                                         HandleRollDice(number);
 
@@ -1098,15 +1164,13 @@ namespace SiedlerVonSaffar.GameLogic
                 }
                 else
                 {
-                    if (rxObject is SocketStateObject)
+                    if (rxObject is RecieveMessage)
                     {
-                        SocketStateObject state = (SocketStateObject)rxObject;
+                        RecieveMessage message = (RecieveMessage)rxObject;
 
-                        if (tcpProtocol.isClientDataPattern(state.buffer))
+                        if (tcpProtocol.isClientDataPattern(message.Data))
                         {
-                            byte[] buffer = (byte[])rxObject;
-
-                            byte[] equalBytes = { buffer[0], buffer[1], buffer[2], buffer[3] };
+                            byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
 
                             if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
                             {

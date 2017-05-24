@@ -15,11 +15,13 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
         public readonly byte[] PLAYER_STAGE_FOUNDATION_ROLL_DICE;
         public readonly byte[] PLAYER_CONTAINER_DATA;
         public readonly byte[] PLAYER_ROLL_DICE;
+        public readonly byte[] PLAYER_DEAL;
 
         public readonly byte[] SERVER_PLAYER_DATA;
         public readonly byte[] SERVER_NEED_PLAYER_NAME;
         public readonly byte[] SERVER_STAGE_FOUNDATION_ROLL_DICE;
-        public readonly byte[] SERVER_CONTAINER_DATA;
+        public readonly byte[] SERVER_CONTAINER_DATA_OWN;
+        public readonly byte[] SERVER_CONTAINER_DATA_OTHER;
 
         public readonly byte[] PLAYER_LOGIN_TO_SERVER;
 
@@ -32,8 +34,10 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
             SERVER_STAGE_FOUNDATION_ROLL_DICE = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_STAGE_FOUNDATION_ROLL_DICE);
             PLAYER_STAGE_FOUNDATION_ROLL_DICE = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_STAGE_FOUNDATION_ROLL_DICE);
             PLAYER_CONTAINER_DATA = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_CONTAINER_DATA);
-            SERVER_CONTAINER_DATA = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_CONTAINER_DATA);
+            SERVER_CONTAINER_DATA_OWN = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_CONTAINER_DATA_OWN);
             PLAYER_ROLL_DICE = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_ROLL_DICE);
+            PLAYER_DEAL = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_DEAL);
+            SERVER_CONTAINER_DATA_OTHER = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_DEAL);
         }
 
         public bool isClientDataPattern(byte[] data)

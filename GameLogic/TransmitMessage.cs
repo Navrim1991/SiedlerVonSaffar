@@ -27,10 +27,10 @@ namespace SiedlerVonSaffar.GameLogic
             TransmitTyp = transmitTyp;
         }
 
-        public TransmitMessage(byte[] data, TransmitTyps transmitTyp)
+        public TransmitMessage(byte[] data)
         {
             Data = data;
-            TransmitTyp = transmitTyp;
+            TransmitTyp = TransmitTyps.TO_ALL;
         }
 
     }
