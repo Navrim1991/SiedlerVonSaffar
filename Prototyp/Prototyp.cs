@@ -244,104 +244,122 @@ namespace SiedlerVonSaffar.Prototyp
 
             object txObject;
 
+            int foundationCounter = 0;
+
             while (input != exitString)
             {
                 while (gameLogic.TxQueue.Count < 1);
 
                 gameLogic.TxQueue.TryDequeue(out txObject);
 
-                if (txObject is GameLogic.TransmitMessage)
+                if(foundationCounter < (players.Count * 3 + clients.Count ))
                 {
-                    GameLogic.TransmitMessage message = (GameLogic.TransmitMessage)txObject;
-
-                    if (tcpProtocol.IsServerDataPattern(message.Data))
+                    if (txObject is GameLogic.TransmitMessage)
                     {
-                        byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
+                        GameLogic.TransmitMessage message = (GameLogic.TransmitMessage)txObject;
 
-                        if (tcpProtocol.SERVER_NEED_PLAYER_NAME.SequenceEqual(equalBytes))
+                        if (tcpProtocol.IsServerDataPattern(message.Data))
                         {
-                            if(message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_ALL)
+                            byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
+
+                            if (tcpProtocol.SERVER_NEED_PLAYER_NAME.SequenceEqual(equalBytes))
                             {
-                                gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(clients[0], HandlePlayerName("Hans")));
-                                gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(clients[1], HandlePlayerName("Kathi")));
-                                gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(clients[2], HandlePlayerName("Max")));
-
-                                gameLogic.Signal();
-                            }
-                        }
-                        else if(tcpProtocol.SERVER_PLAYER_DATA.SequenceEqual(equalBytes))
-                        {
-                            if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OWN)
-                            {
-                                GameObjects.Player.Player tmp = HandlePlayerData(message.Data);
-
-                                if(!players.Contains(tmp))
+                                if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_ALL)
                                 {
-                                    players.Add(tmp);
-                                }
-                                else
-                                {
-                                    GameObjects.Player.Player current = (from p in players where p.PlayerID == tmp.PlayerID select p).First();
+                                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(clients[0], HandlePlayerName("Hans")));
+                                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(clients[1], HandlePlayerName("Kathi")));
+                                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(clients[2], HandlePlayerName("Max")));
 
-                                    players.Remove(current);
-                                    players.Add(tmp);
+                                    gameLogic.Signal();
                                 }
                             }
-                        }
-                        else if (tcpProtocol.SERVER_STAGE_FOUNDATION_ROLL_DICE.SequenceEqual(equalBytes))
-                        {
-                            if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_ALL)
+                            else if (tcpProtocol.SERVER_PLAYER_DATA.SequenceEqual(equalBytes))
                             {
-                                foreach(GameObjects.Player.Player element in players)
+                                if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OWN)
                                 {
-                                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(element.ClientIP, HandleRollDice(new Random().Next(1,12))));
+                                    GameObjects.Player.Player tmp = HandlePlayerData(message.Data);
+
+                                    GameObjects.Player.Player tmp2 = (from p in players where p.PlayerID == tmp.PlayerID select p).FirstOrDefault();
+
+                                    if (tmp2 == null)
+                                    {
+                                        players.Add(tmp);
+                                    }
+                                    else
+                                    {
+                                        GameObjects.Player.Player current = (from p in players where p.PlayerID == tmp.PlayerID select p).First();
+
+                                        players.Remove(current);
+                                        players.Add(tmp);
+                                    }
                                 }
-
-                                gameLogic.Signal();
                             }
-                        }
-                        else if (tcpProtocol.SERVER_CONTAINER_DATA_OWN.SequenceEqual(equalBytes))
-                        {
-                            if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OWN)
+                            else if (tcpProtocol.SERVER_STAGE_FOUNDATION_ROLL_DICE.SequenceEqual(equalBytes))
                             {
-                                GameObjects.Player.Player current = (from p in players where p.ClientIP.ToString() == message.IPToSend.ToString() select p).First();
-
-                                globalContainer = HandleContainerDataOwn(message.Data);
-
-                                buildHyperloop(ref current);
-
-                                buildCityOrOutpost(ref current);
-
-                                byte[] data = HandlePlayerData(current);
-
-                                gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(current.ClientIP, data));
-
-                                data = HandleContainerData(globalContainer);
-
-                                gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(current.ClientIP, data));                                
-
-                                gameLogic.Signal();
-
-                            }
-                        }
-                        else if (tcpProtocol.SERVER_CONTAINER_DATA_OTHER.SequenceEqual(equalBytes))
-                        {
-                            if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OTHER)
-                            {
-                                /*foreach (GameObjects.Player.Player element in players)
+                                if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_ALL)
                                 {
-                                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(element.ClientIP, HandleRollDice(new Random().Next(1, 12))));
+                                    foreach (GameObjects.Player.Player element in players)
+                                    {
+                                        gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(element.ClientIP, HandleRollDice(new Random().Next(1, 12))));
+                                    }
+
+                                    gameLogic.Signal();
                                 }
-
-                                gameLogic.Signal();*/
                             }
-                        }
+                            else if (tcpProtocol.SERVER_CONTAINER_DATA_OWN.SequenceEqual(equalBytes))
+                            {
+                                if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OWN)
+                                {
+                                    GameObjects.Player.Player current = (from p in players where p.ClientIP.ToString() == message.IPToSend.ToString() select p).First();
 
+                                    globalContainer = HandleContainerDataOwn(message.Data);
+
+                                    buildHyperloop(ref current);
+
+                                    buildCityOrOutpost(ref current);
+
+                                    byte[] data = HandlePlayerData(current);
+
+                                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(current.ClientIP, data));
+
+                                    data = HandleContainerData(globalContainer);
+
+                                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(current.ClientIP, data));
+
+                                    gameLogic.Signal();
+
+                                    foundationCounter++;
+                                }
+                            }
+                            else if (tcpProtocol.SERVER_CONTAINER_DATA_OTHER.SequenceEqual(equalBytes))
+                            {
+                                if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OTHER)
+                                {
+                                    /*foreach (GameObjects.Player.Player element in players)
+                                    {
+                                        gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(element.ClientIP, HandleRollDice(new Random().Next(1, 12))));
+                                    }
+
+                                    gameLogic.Signal();*/
+                                }
+                            }
+
+                        }
                     }
                 }
-            }
-        }
+                else
+                {
+                    if (txObject is GameLogic.TransmitMessage)
+                    {
+                        GameLogic.TransmitMessage message = (GameLogic.TransmitMessage)txObject;
 
-        
+                        if (tcpProtocol.IsServerDataPattern(message.Data))
+                        {
+
+                        }
+                    }
+                }                
+            }
+        }        
     }
 }

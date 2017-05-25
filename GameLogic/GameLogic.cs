@@ -23,17 +23,19 @@ namespace SiedlerVonSaffar.GameLogic
 
         private GameObjects.Player.Player currentPlayer;
 
-        public GameObjects.Player.Player CurrentPlayer {
+        public GameObjects.Player.Player CurrentPlayer
+        {
             get
             {
                 return currentPlayer;
             }
         }
+
         private DataStruct.Container containerData;
         private ThreadStart gameLogicThreadStart;
         private Thread gameLogicThread;
         private TcpIpProtocol tcpProtocol;
-        private GameObjects.GameStage.GameStages gameStage;
+        private GameStage.GameStages gameStage;
 
         private readonly short COUNT_RESOURCE_CARDS = 24;
 
@@ -71,347 +73,18 @@ namespace SiedlerVonSaffar.GameLogic
             gameLogicThread.Start();
         }
 
+        #region Threading
+
+        private EventWaitHandle waitHandle = new EventWaitHandle(false, EventResetMode.ManualReset);
+
+        public void Signal()
+        {
+            waitHandle.Set();
+        }
+
+        #endregion
+
         #region Handle Data
-
-        /*private void HandelContainerData(GameObjects.Player.Player player)
-        {
-            MemoryStream stream = new MemoryStream();
-            IFormatter formatter = new BinaryFormatter();
-            formatter.Serialize(stream, dataContainer);
-
-            byte[] data = new byte[stream.GetBuffer().Length + tcpProtocol.SERVER_DATA.Length];
-
-            data.SetValue(tcpProtocol.SERVER_DATA, 0);
-            data.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_DATA.Length + 1);
-
-            //TODO: data loschicken nur wie
-        }
-
-
-        private void HandlePlayer(byte[] playerData)
-        {
-            MemoryStream stream = new MemoryStream(playerData);
-
-            stream.Seek(5, SeekOrigin.End);
-
-            IFormatter formatter = new BinaryFormatter();
-
-            GameObjects.Player.Player player = (GameObjects.Player.Player)formatter.Deserialize(stream);
-
-            //TODO player Data handeln            
-        }
-
-        private void HandelContainerData(byte[] containerData)
-        {
-            MemoryStream stream = new MemoryStream(containerData);
-
-            stream.Seek(5, SeekOrigin.End);
-
-            IFormatter formatter = new BinaryFormatter();
-
-            DataStruct.Container dataContainer = (DataStruct.Container)formatter.Deserialize(stream);
-
-            this.dataContainer = dataContainer;
-        }
-
-        private void HandleDeal(byte[] dealData)
-        {
-            byte[] palyerCard = new byte[(dealData.Length - 4) / 2];
-            byte[] serverCard = new byte[(dealData.Length - 4) / 2];
-
-            for (int i = 0; i < palyerCard.Length; i++)
-            {
-                palyerCard[i] = dealData[i + 4];
-            }
-
-            for (int i = 0; i < serverCard.Length; i++)
-            {
-                serverCard[i] = dealData[i + ((dealData.Length - 4) / 2)];
-            }
-
-            MemoryStream stream = new MemoryStream(palyerCard);
-
-            IFormatter formatter = new BinaryFormatter();
-
-            GameObjects.Menu.Cards.Resources.ResourceCard resourceCardPlayer = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
-
-            stream = new MemoryStream(serverCard);
-
-            GameObjects.Menu.Cards.Resources.ResourceCard resourceCardServer = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
-
-            short dealRelation = 4;
-
-            GameObjects.Buildings.Building upperAngleBuilding;
-            GameObjects.Buildings.Building lowerAngleBuilding;
-
-            foreach (DataStruct.Harbor element in dataContainer.Harbors)
-            {
-                upperAngleBuilding = null;
-                lowerAngleBuilding = null;
-
-                if (element.UpperAngel.BuildTyp != DataStruct.BuildTypes.NONE)
-                {
-                    if (element.UpperAngel.BuildTyp == DataStruct.BuildTypes.CITY)
-                        upperAngleBuilding = (GameObjects.Buildings.City)element.UpperAngel.Building;
-                    else
-                        upperAngleBuilding = (GameObjects.Buildings.Outpost)element.UpperAngel.Building;
-                }
-
-                if (element.LowerAngel.Building != null)
-                {
-                    if (element.LowerAngel.BuildTyp == DataStruct.BuildTypes.CITY)
-                        lowerAngleBuilding = (GameObjects.Buildings.City)element.UpperAngel.Building;
-                    else
-                        lowerAngleBuilding = (GameObjects.Buildings.Outpost)element.UpperAngel.Building;
-                }
-
-                if (upperAngleBuilding != null && upperAngleBuilding.PlayerID == currentPlayer.PlayerID)
-                {
-                    if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.GetType())
-                    {
-                        dealRelation = 2;
-                        break;
-                    }
-                    else
-                        dealRelation = 3;
-                }
-                if (dealRelation > 2)
-                {
-                    if (lowerAngleBuilding != null && lowerAngleBuilding.PlayerID == currentPlayer.PlayerID)
-                    {
-                        if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.Resource.GetType())
-                        {
-                            dealRelation = 2;
-                            break;
-                        }
-                        else
-                            dealRelation = 3;
-                    }
-                }
-            }
-
-            bool canDeal = false;
-
-            if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Biomass)
-            {
-                if (currentPlayer.ResourceCardsBiomass.Count >= dealRelation)
-                {
-                    canDeal = true;
-
-                    for (int i = 0; i < dealRelation; i++)
-                    {
-                        currentPlayer.ResourceCardsBiomass.Remove(currentPlayer.ResourceCardsBiomass.First());
-                        ResourceCardsBiomass.Add(new GameObjects.Menu.Cards.Resources.Biomass());
-                    }
-                }
-
-            }
-            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.CarbonFibres)
-            {
-                if (currentPlayer.ResourceCardsCarbonFibres.Count >= dealRelation)
-                {
-                    canDeal = true;
-
-                    for (int i = 0; i < dealRelation; i++)
-                    {
-                        currentPlayer.ResourceCardsCarbonFibres.Remove(currentPlayer.ResourceCardsCarbonFibres.First());
-                        ResourceCardsCarbonFibres.Add(new GameObjects.Menu.Cards.Resources.CarbonFibres());
-                    }
-                }
-            }
-            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Deuterium)
-            {
-                if (currentPlayer.ResourceCardsDeuterium.Count >= dealRelation)
-                {
-                    canDeal = true;
-
-                    for (int i = 0; i < dealRelation; i++)
-                    {
-                        currentPlayer.ResourceCardsDeuterium.Remove(currentPlayer.ResourceCardsDeuterium.First());
-                        ResourceCardsDeuterium.Add(new GameObjects.Menu.Cards.Resources.Deuterium());
-                    }
-                }
-            }
-            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.FriendlyAlien)
-            {
-                if (currentPlayer.ResourceCardsFriendlyAlien.Count >= dealRelation)
-                {
-                    canDeal = true;
-
-                    for (int i = 0; i < dealRelation; i++)
-                    {
-                        currentPlayer.ResourceCardsFriendlyAlien.Remove(currentPlayer.ResourceCardsFriendlyAlien.First());
-                        ResourceCardsFriendlyAlien.Add(new GameObjects.Menu.Cards.Resources.FriendlyAlien());
-                    }
-                }
-            }
-            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Titan)
-            {
-                if (currentPlayer.ResourceCardsTitan.Count >= dealRelation)
-                {
-                    canDeal = true;
-
-                    for (int i = 0; i < dealRelation; i++)
-                    {
-                        currentPlayer.ResourceCardsTitan.Remove(currentPlayer.ResourceCardsTitan.First());
-                        ResourceCardsTitan.Add(new GameObjects.Menu.Cards.Resources.Titan());
-                    }
-                }
-            }
-
-            if (canDeal)
-            {
-                stream = new MemoryStream();
-                formatter = new BinaryFormatter();
-                formatter.Serialize(stream, currentPlayer);
-
-                byte[] data = new byte[stream.GetBuffer().Length + tcpProtocol.SERVER_PLAYER_DATA.Length];
-
-                data.SetValue(tcpProtocol.SERVER_PLAYER_DATA, 0);
-                data.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_PLAYER_DATA.Length + 1);
-
-                //TODO: data loschicken nur wie
-            }
-            else
-            {
-                //TODO: data loschicken nur wie
-            }
-
-        }
-
-        private void HandleRollDice(byte[] data)
-        {
-            byte[] diceOne = new byte[(data.Length - 4) / 2];
-            byte[] diceTwo = new byte[(data.Length - 4) / 2];
-
-            for (int i = 0; i < diceOne.Length; i++)
-            {
-                diceOne[i] = data[i + 4];
-            }
-
-            for (int i = 0; i < diceTwo.Length; i++)
-            {
-                diceTwo[i] = data[i + ((data.Length - 4) / 2)];
-            }
-
-            MemoryStream stream = new MemoryStream(diceOne);
-
-            IFormatter formatter = new BinaryFormatter();
-
-            int valueDiceOne = (int)formatter.Deserialize(stream);
-
-            stream = new MemoryStream(diceTwo);
-
-            int valueDiceTwo = (int)formatter.Deserialize(stream);
-
-            List<DataStruct.Hexagon> hexagons = new List<DataStruct.Hexagon>();
-
-            for (int i = 0; i < dataContainer.Hexagons.GetLength(0); i++)
-            {
-                for (int j = 0; j < dataContainer.Hexagons.GetLength(1); j++)
-                {
-                    if (dataContainer.Hexagons[i, j].HexagonID == (valueDiceOne + valueDiceTwo))
-                        hexagons.Add(dataContainer.Hexagons[i, j]);
-                }
-            }
-
-            foreach (DataStruct.Hexagon element in hexagons)
-            {
-                foreach (DataStruct.Angle innerElement in element.Angles)
-                {
-                    if (innerElement.Building != null)
-                    {
-                        GameObjects.Buildings.Building building = null;
-
-                        if (innerElement.BuildTyp == DataStruct.BuildTypes.CITY)
-                            building = (GameObjects.Buildings.City)innerElement.Building;
-                        else
-                            building = (GameObjects.Buildings.Outpost)innerElement.Building;
-
-                        foreach (GameObjects.Player.Player playerElement in Players)
-                        {
-                            if (playerElement.PlayerID == building.PlayerID)
-                            {
-                                int countResources = 1;
-
-                                if (innerElement.BuildTyp == DataStruct.BuildTypes.CITY)
-                                    countResources++;
-
-                                if (element.HexagonTyp == DataStruct.HexagonTypes.BIOMASS_FACTORY)
-                                {
-                                    if (countResources <= ResourceCardsBiomass.Count)
-                                    {
-                                        for (int i = 0; i < countResources; i++)
-                                        {
-                                            ResourceCardsBiomass.RemoveAt(0);
-                                            playerElement.ResourceCardsBiomass.Add(new GameObjects.Menu.Cards.Resources.Biomass());
-                                        }
-                                    }
-                                }
-                                else if (element.HexagonTyp == DataStruct.HexagonTypes.COAL_MINE)
-                                {
-                                    if (countResources <= ResourceCardsCarbonFibres.Count)
-                                    {
-                                        for (int i = 0; i < countResources; i++)
-                                        {
-                                            ResourceCardsCarbonFibres.RemoveAt(0);
-                                            playerElement.ResourceCardsCarbonFibres.Add(new GameObjects.Menu.Cards.Resources.CarbonFibres());
-                                        }
-                                    }
-                                }
-                                else if (element.HexagonTyp == DataStruct.HexagonTypes.DEUTERIUM_GAS_FIELD)
-                                {
-                                    if (countResources <= ResourceCardsDeuterium.Count)
-                                    {
-                                        for (int i = 0; i < countResources; i++)
-                                        {
-                                            ResourceCardsDeuterium.RemoveAt(0);
-                                            playerElement.ResourceCardsDeuterium.Add(new GameObjects.Menu.Cards.Resources.Deuterium());
-                                        }
-                                    }
-                                }
-                                else if (element.HexagonTyp == DataStruct.HexagonTypes.FRIENDLY_ALIEN)
-                                {
-                                    if (countResources <= ResourceCardsFriendlyAlien.Count)
-                                    {
-                                        for (int i = 0; i < countResources; i++)
-                                        {
-                                            ResourceCardsFriendlyAlien.RemoveAt(0);
-                                            playerElement.ResourceCardsFriendlyAlien.Add(new GameObjects.Menu.Cards.Resources.FriendlyAlien());
-                                        }
-                                    }
-                                }
-                                else if (element.HexagonTyp == DataStruct.HexagonTypes.TITAN_MINE)
-                                {
-                                    if (countResources <= ResourceCardsFriendlyAlien.Count)
-                                    {
-                                        for (int i = 0; i < countResources; i++)
-                                        {
-                                            ResourceCardsTitan.RemoveAt(0);
-                                            playerElement.ResourceCardsTitan.Add(new GameObjects.Menu.Cards.Resources.Titan());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            foreach (GameObjects.Player.Player playerElement in Players)
-            {
-                stream = new MemoryStream();
-                formatter = new BinaryFormatter();
-                formatter.Serialize(stream, currentPlayer);
-
-                byte[] playerData = new byte[stream.GetBuffer().Length + tcpProtocol.SERVER_PLAYER_DATA.Length];
-
-                data.SetValue(tcpProtocol.SERVER_PLAYER_DATA, 0);
-                data.SetValue(stream.GetBuffer(), tcpProtocol.SERVER_PLAYER_DATA.Length + 1);
-
-                //TODO: data loschicken nur wie
-            }
-        }*/
 
         private void HandleDeal(byte[] dealData)
         {
@@ -726,6 +399,50 @@ namespace SiedlerVonSaffar.GameLogic
             return data;
         }
 
+ 
+
+        private GameObjects.Player.Player HandelPlayerData(byte[] playerData)
+        {
+            MemoryStream stream = new MemoryStream(playerData);
+            stream.Seek(5, SeekOrigin.Begin);
+            IFormatter formatter = new BinaryFormatter();
+
+            return (GameObjects.Player.Player)formatter.Deserialize(stream);
+        }
+
+        private void SerializeContainerData()
+        {
+            byte[] data = this.Serialize(tcpProtocol.SERVER_CONTAINER_DATA_OWN, containerData);
+
+            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
+
+            data = this.Serialize(tcpProtocol.SERVER_CONTAINER_DATA_OTHER, containerData);
+
+            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
+        }
+
+        private void SerializePlayerData(GameObjects.Player.Player player)
+        {
+            byte[] data = this.Serialize(tcpProtocol.SERVER_PLAYER_DATA, player);
+
+            TxQueue.Enqueue(new TransmitMessage(player.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
+
+            //TODO make the proxy
+
+            TxQueue.Enqueue(new TransmitMessage(player.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
+        }
+
+        private void DeserializeContainerData(byte[] data)
+        {
+            this.containerData = (DataStruct.Container)Deserialize(data);
+
+            ResetContainerDataBuildStruct();
+        }
+
+        #endregion
+
+        #region Workaround Methods
+
         private void ResetContainerDataBuildStruct()
         {
             DataStruct.Angle[,] angles = this.containerData.Angles;
@@ -769,77 +486,37 @@ namespace SiedlerVonSaffar.GameLogic
             }
         }
 
-        private GameObjects.Player.Player HandelPlayerData(byte[] playerData)
-        {
-            MemoryStream stream = new MemoryStream(playerData);
-            stream.Seek(5, SeekOrigin.Begin);
-            IFormatter formatter = new BinaryFormatter();
-
-            return (GameObjects.Player.Player)formatter.Deserialize(stream);
-        }
-
-        private void SerializeContainerData()
-        {
-            byte[] data = this.Serialize(tcpProtocol.SERVER_CONTAINER_DATA_OWN, containerData);
-
-            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
-
-            data = this.Serialize(tcpProtocol.SERVER_CONTAINER_DATA_OTHER, containerData);
-
-            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
-        }
-
-        private void SerializePlayerData(GameObjects.Player.Player player)
-        {
-            byte[] data = this.Serialize(tcpProtocol.SERVER_PLAYER_DATA, player);
-
-            TxQueue.Enqueue(new TransmitMessage(player.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
-
-            //TODO make the proxy
-
-            TxQueue.Enqueue(new TransmitMessage(player.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
-        }
-
-        private void DeserializeContainerData(byte[] data)
-        {
-            this.containerData = (DataStruct.Container)Deserialize(data);
-
-            ResetContainerDataBuildStruct();
-        }
-
-        #endregion
-
         private void nextPlayer()
         {
             Players.Enqueue(currentPlayer);
             currentPlayer = Players.Dequeue();
         }
 
-        private EventWaitHandle waitHandle  = new EventWaitHandle(false, EventResetMode.ManualReset);
-
-        public void Signal()
-        {
-            waitHandle.Set();
-        }
-
         private void FoundationStages(ref int foundationStageRoundCounter)
         {
+            
+
+
             if (foundationStageRoundCounter % 2 == 0)
             {
                 checkAngles();
 
-                SerializeContainerData();
-
                 foundationStageRoundCounter++;
+
+                if (foundationStageRoundCounter > Players.Count * 2 + 2
+                    && gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_TWO)
+                    return;
+
+                SerializeContainerData();               
 
             }
             else
             {
                 checkEdges();
 
-                SerializeContainerData();
-
                 foundationStageRoundCounter++;
+
+                SerializeContainerData();                
             }
         }
 
@@ -857,6 +534,330 @@ namespace SiedlerVonSaffar.GameLogic
 
             TxQueue.Enqueue(new TransmitMessage(newPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
         }
+
+        #endregion
+
+        #region Game Rules
+
+        private bool CanSetStructHyperloop()
+        {
+            if (currentPlayer.ResourceCardsCarbonFibres > 0 && currentPlayer.ResourceCardsDeuterium > 0)
+                return true;
+
+            return false;
+        }
+
+        private bool CanSetStructOutpost()
+        {
+            if (currentPlayer.ResourceCardsCarbonFibres > 0 && currentPlayer.ResourceCardsDeuterium > 0
+                && currentPlayer.ResourceCardsFriendlyAlien > 0 && currentPlayer.ResourceCardsBiomass > 0)
+                return true;
+
+            return false;
+
+        }
+
+        private bool CanSetStructCity()
+        {
+            if (currentPlayer.ResourceCardsTitan >= 3 && currentPlayer.ResourceCardsBiomass > 2)
+                return true;
+
+            return false;
+        }
+
+        private bool IsBuildableAngle(DataStruct.Angle angle)
+        {
+            if (angle == null)
+                return false;
+
+            if (angle.Hexagons.Count == 0)
+                return false;
+
+            return true;
+
+        }
+
+        private bool IsSameAngle(DataStruct.Angle first, DataStruct.Angle second)
+        {
+            if ((first.PositionX == second.PositionX && first.PositionY == second.PositionY))
+                return true;
+
+            return false;
+        }
+
+        private bool CanAngleSetBuilding(DataStruct.Angle upperAngle, DataStruct.Angle lowerAngle, ref DataStruct.Angle currentAngle)
+        {
+            if (!IsSameAngle(upperAngle, currentAngle))
+            {
+                if (upperAngle.Building != null)
+                {
+                    currentAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+                    return false; ;
+                }
+            }
+
+            if (!IsSameAngle(lowerAngle, currentAngle))
+            {
+                if (lowerAngle.Building != null)
+                {
+                    currentAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+                    return false; ;
+                }
+            }
+
+            return true;
+        }
+
+        private void checkAngles()
+        {
+            DataStruct.Angle[,] angles = containerData.Angles;
+
+            DataStruct.Angle tmpAngle;
+
+            if (gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROLLING_DICE
+                || gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_ONE
+                || gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_TWO)
+            {
+                int buildingCounter = 0;
+
+                for (int i = 0; i < angles.GetLength(0); i++)
+                {
+                    for (int j = 0; j < angles.GetLength(1); j++)
+                    {
+
+                        if (!IsBuildableAngle(angles[i, j]))
+                            continue;
+
+                        tmpAngle = angles[i, j];
+
+                        if (tmpAngle.BuildTyp != DataStruct.BuildTypes.NONE)
+                            continue;
+
+                        tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_OUTPOST;
+
+                        foreach (DataStruct.Edge element in tmpAngle.Edges)
+                        {
+                            DataStruct.Angle upperAngle = element.UpperAngel;
+                            DataStruct.Angle lowerAngle = element.LowerAngel;
+
+
+                            if (!CanAngleSetBuilding(upperAngle, lowerAngle, ref tmpAngle))
+                                break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < angles.GetLength(0); i++)
+                {
+                    for (int j = 0; j < angles.GetLength(1); j++)
+                    {
+                        if (!IsBuildableAngle(angles[i, j]))
+                            continue;
+
+                        tmpAngle = angles[i, j];
+
+                        switch (tmpAngle.BuildTyp)
+                        {
+                            case DataStruct.BuildTypes.NONE:
+
+                                tmpAngle.BuildStruct = tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_OUTPOST;
+
+                                //Gehe alle kanten an den Ecken durch
+                                foreach (DataStruct.Edge element in tmpAngle.Edges)
+                                {
+                                    if (element.Building != null)
+                                    {
+                                        GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)tmpAngle.Building;
+
+                                        //Wenn eine Kante eine Eigene Straße beinhaltet darf eine Außenposten gebaut werden
+                                        if (hyperloop.PlayerID == currentPlayer.PlayerID)
+                                        {
+                                            DataStruct.Angle upperAngle = element.UpperAngel;
+                                            DataStruct.Angle lowerAngle = element.LowerAngel;
+
+                                            tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_OUTPOST;
+
+                                            if (!CanAngleSetBuilding(upperAngle, lowerAngle, ref tmpAngle))
+                                                break;
+                                        }
+                                    }
+                                }
+                                break;
+                            case DataStruct.BuildTypes.OUTPOST:
+                                GameObjects.Buildings.Outpost outpost = (GameObjects.Buildings.Outpost)tmpAngle.Building;
+
+                                //Wenn der Außenposten dem spieler gehört, darf er eine Stadt Bauen
+                                if (outpost.PlayerID == currentPlayer.PlayerID)
+                                    tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_CITY;
+                                else
+                                    tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+
+        private bool IsBuildingFromPlayer(GameObjects.Buildings.Building building, GameObjects.Player.Player player)
+        {
+            if ((building != null && building.PlayerID == player.PlayerID))
+                return true;
+
+            return false;
+        }
+
+        private void checkEdges()
+        {
+            DataStruct.DataStruct[,] edges = containerData.Data;
+
+            DataStruct.Edge tmpEdge;
+
+            for (int i = 0; i < edges.GetLength(0); i++)
+            {
+                for (int j = 0; j < edges.GetLength(1); j++)
+                {
+                    if (edges[i, j] == null)
+                        continue;
+                    else if (edges[i, j] is DataStruct.Hexagon)
+                        continue;
+
+                    tmpEdge = (DataStruct.Edge)edges[i, j];
+
+                    GameObjects.Buildings.Outpost buildingUpperAngle = null;
+                    GameObjects.Buildings.Outpost buildingLowerAngle = null;
+
+                    //Wenn an der oberen Ecke ein Gebäude existiert 
+                    if (tmpEdge.UpperAngel.BuildTyp != DataStruct.BuildTypes.NONE)
+                    {
+                        if (tmpEdge.UpperAngel.BuildTyp == DataStruct.BuildTypes.OUTPOST)
+                            buildingUpperAngle = (GameObjects.Buildings.Outpost)tmpEdge.UpperAngel.Building;
+                        else
+                            buildingUpperAngle = (GameObjects.Buildings.City)tmpEdge.UpperAngel.Building;
+                    }
+
+                    //Wenn an der unteren Ecke ein Gebäude existiert
+                    if (tmpEdge.LowerAngel.BuildTyp != DataStruct.BuildTypes.NONE)
+                    {
+                        if (tmpEdge.LowerAngel.BuildTyp == DataStruct.BuildTypes.OUTPOST)
+                            buildingLowerAngle = (GameObjects.Buildings.Outpost)tmpEdge.LowerAngel.Building;
+                        else
+                            buildingLowerAngle = (GameObjects.Buildings.City)tmpEdge.LowerAngel.Building;
+                    }
+
+                    switch (tmpEdge.BuildTyp)
+                    {
+                        case DataStruct.BuildTypes.NONE:
+                            tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+                            //Wenn keine Gebäude oder nur ein Gebäude an dieser Kante existierem
+                            if (gameStage == GameStage.GameStages.PLAYER_STAGE_BUILD
+                                || gameStage == GameStage.GameStages.PLAYER_STAGE_DEAL)
+                            {
+                                if (buildingUpperAngle == null || buildingLowerAngle == null)
+                                {
+                                    //wenn eine eigene Hyperloop an der Kante angrenzt
+                                    //Obere Kanten prüfen
+                                    foreach (DataStruct.Edge element in tmpEdge.UpperAngel.Edges)
+                                    {
+                                        if (element.Building != null && element.PositionX != j && element.PositionY != i)
+                                        {
+                                            GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)element.Building;
+
+                                            if (hyperloop.PlayerID == currentPlayer.PlayerID)
+                                            {
+                                                tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
+                                                break;
+                                            }
+
+                                        }
+                                    }
+
+                                    //Untere Kanten prüfen
+                                    foreach (DataStruct.Edge element in tmpEdge.LowerAngel.Edges)
+                                    {
+                                        if (element.Building != null && element.PositionX != j && element.PositionY != i)
+                                        {
+                                            GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)element.Building;
+
+                                            if (hyperloop.PlayerID == currentPlayer.PlayerID)
+                                            {
+                                                tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (tmpEdge.BuildStruct == DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP)
+                                        continue;
+                                }
+                                //Wenn an der oberen Ecke ein eigenes Gebäude existiert
+                                if (IsBuildingFromPlayer(buildingUpperAngle, currentPlayer))
+                                {
+                                    tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
+                                }
+
+                                //Wenn an der unteren Ecke ein eigenes Gebäude existiert
+                                if (IsBuildingFromPlayer(buildingLowerAngle, currentPlayer))
+                                {
+                                    tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
+                                }
+                            }
+                            else if (gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_ONE
+                                || gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_TWO)
+                            {
+                                if (IsBuildingFromPlayer(buildingUpperAngle, currentPlayer))
+                                {
+                                    int counter = 0;
+                                    foreach (DataStruct.Edge element in tmpEdge.UpperAngel.Edges)
+                                    {
+                                        if (element.Building != null)
+                                            counter++;
+                                    }
+
+                                    if (counter == 0)
+                                        tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
+                                }
+
+                                if (IsBuildingFromPlayer(buildingLowerAngle, currentPlayer))
+                                {
+                                    int counter = 0;
+                                    foreach (DataStruct.Edge element in tmpEdge.LowerAngel.Edges)
+                                    {
+                                        if (element.Building != null)
+                                            counter++;
+                                    }
+
+                                    if (counter == 0)
+                                        tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
+                                }
+
+                            }
+
+
+                            break;
+                        case DataStruct.BuildTypes.HYPERLOOP:
+                            tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+
+                            break;
+                    }
+                }
+            }
+        }
+
+        private void ComputeGameRules()
+        {
+            if (CanSetStructCity() && CanSetStructOutpost())
+                checkAngles();
+
+            if (CanSetStructHyperloop())
+                checkEdges();
+        }
+
+        #endregion
+
+
 
         private void Start()
         {
@@ -939,8 +940,7 @@ namespace SiedlerVonSaffar.GameLogic
                                                 else
                                                 {
                                                     Players.Enqueue(Players.Dequeue());
-                                                }
-                                                
+                                                }                                                
                                             }
                                         }    
                                     }
@@ -1030,11 +1030,13 @@ namespace SiedlerVonSaffar.GameLogic
 
                                             nextPlayer();
 
+                                            gameStage = GameStage.GameStages.PLAYER_STAGE_ROLL_DICE;
+
                                             ComputeGameRules();
 
                                             SerializeContainerData();
 
-                                            gameStage = GameStage.GameStages.PLAYER_STAGE_ROLL_DICE;
+                                            
                                         }
                                     }
                                     else if (tcpProtocol.PLAYER_DATA.SequenceEqual(equalBytes))
@@ -1169,320 +1171,10 @@ namespace SiedlerVonSaffar.GameLogic
                 }
             }
         }
-        private bool CanSetStructHyperloop()
-        {
-            if (currentPlayer.ResourceCardsCarbonFibres > 0 && currentPlayer.ResourceCardsDeuterium > 0)
-                return true;
-
-            return false;
-        }
-
-        private bool CanSetStructOutpost()
-        {
-            if (currentPlayer.ResourceCardsCarbonFibres > 0 && currentPlayer.ResourceCardsDeuterium > 0
-                && currentPlayer.ResourceCardsFriendlyAlien > 0 && currentPlayer.ResourceCardsBiomass > 0)
-                return true;
-
-            return false;
-
-        }
-
-        private bool CanSetStructCity()
-        {
-            if (currentPlayer.ResourceCardsTitan >= 3 && currentPlayer.ResourceCardsBiomass > 2)
-                return true;
-
-            return false;
-        }
-
-        private bool IsBuildableAngle(DataStruct.Angle angle)
-        {
-            if (angle == null)
-                return false;
-
-            if (angle.Hexagons.Count == 0)
-                return false;
-
-            return true;
-
-        }
-
-        private bool IsSameAngle(DataStruct.Angle first, DataStruct.Angle second)
-        {
-            if ((first.PositionX == second.PositionX && first.PositionY == second.PositionY))
-                return true;
-
-            return false;
-        }
-
-        private bool CanAngleSetBuilding(DataStruct.Angle upperAngle, DataStruct.Angle lowerAngle,ref DataStruct.Angle currentAngle)
-        {
-            if (!IsSameAngle(upperAngle, currentAngle))
-            {
-                if (upperAngle.Building != null)
-                {
-                    currentAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
-                    return false; ;
-                }
-            }
-
-            if (!IsSameAngle(lowerAngle, currentAngle))
-            {
-                if (lowerAngle.Building != null)
-                {
-                    currentAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
-                    return false; ;
-                }
-            }
-
-            return true;
-        }
-
-        private void checkAngles()
-        {
-            DataStruct.Angle[,] angles = containerData.Angles;
-
-            DataStruct.Angle tmpAngle;
-
-            if (gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROLLING_DICE
-                || gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_ONE
-                || gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_TWO)
-            {
-                int buildingCounter = 0;
-
-                for (int i = 0; i < angles.GetLength(0); i++)
-                {
-                    for (int j = 0; j < angles.GetLength(1); j++)
-                    {
-
-                        if(!IsBuildableAngle(angles[i, j]))
-                            continue;
-
-                        tmpAngle = angles[i, j];
-
-                        if (tmpAngle.BuildTyp != DataStruct.BuildTypes.NONE)
-                            continue;
-
-                        tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_OUTPOST;
-
-                        foreach (DataStruct.Edge element in tmpAngle.Edges)
-                        {
-                            DataStruct.Angle upperAngle = element.UpperAngel;
-                            DataStruct.Angle lowerAngle = element.LowerAngel;
 
 
-                            if (!CanAngleSetBuilding(upperAngle, lowerAngle, ref tmpAngle))
-                                break;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                for (int i = 0; i < angles.GetLength(0); i++)
-                {
-                    for (int j = 0; j < angles.GetLength(1); j++)
-                    {
-                        if (!IsBuildableAngle(angles[i, j]))
-                            continue;
-
-                        tmpAngle = angles[i, j];
-
-                        switch (tmpAngle.BuildTyp)
-                        {
-                            case DataStruct.BuildTypes.NONE:
-
-                                tmpAngle.BuildStruct = tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_OUTPOST;
-
-                                //Gehe alle kanten an den Ecken durch
-                                foreach (DataStruct.Edge element in tmpAngle.Edges)
-                                {
-                                    if (element.Building != null)
-                                    {
-                                        GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)tmpAngle.Building;
-
-                                        //Wenn eine Kante eine Eigene Straße beinhaltet darf eine Außenposten gebaut werden
-                                        if (hyperloop.PlayerID == currentPlayer.PlayerID)
-                                        {
-                                            DataStruct.Angle upperAngle = element.UpperAngel;
-                                            DataStruct.Angle lowerAngle = element.LowerAngel;
-
-                                            tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_OUTPOST;
-
-                                            if (!CanAngleSetBuilding(upperAngle, lowerAngle, ref tmpAngle))
-                                                break;
-                                        }
-                                    }
-                                }
-                                break;
-                            case DataStruct.BuildTypes.OUTPOST:
-                                GameObjects.Buildings.Outpost outpost = (GameObjects.Buildings.Outpost)tmpAngle.Building;
-
-                                //Wenn der Außenposten dem spieler gehört, darf er eine Stadt Bauen
-                                if (outpost.PlayerID == currentPlayer.PlayerID)
-                                    tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_CITY;
-                                else
-                                    tmpAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
-
-                                break;
-                        }
-                    }
-                }
-            }            
-        }
-
-        private bool IsBuildingFromPlayer(GameObjects.Buildings.Building building, GameObjects.Player.Player player)
-        {
-            if((building != null && building.PlayerID == player.PlayerID))
-                return true;
-
-            return false;
-        }
-
-        private void checkEdges()
-        {
-            DataStruct.DataStruct[,] edges = containerData.Data;
-
-            DataStruct.Edge tmpEdge;
-
-            for (int i = 0; i < edges.GetLength(0); i++)
-            {
-                for (int j = 0; j < edges.GetLength(1); j++)
-                {
-                    if (edges[i, j] == null)
-                        continue;
-                    else if (edges[i, j] is DataStruct.Hexagon)
-                        continue;
-
-                    tmpEdge = (DataStruct.Edge)edges[i, j];
-
-                    GameObjects.Buildings.Outpost buildingUpperAngle = null;
-                    GameObjects.Buildings.Outpost buildingLowerAngle = null;
-
-                    //Wenn an der oberen Ecke ein Gebäude existiert 
-                    if (tmpEdge.UpperAngel.BuildTyp != DataStruct.BuildTypes.NONE)
-                    {
-                        if (tmpEdge.UpperAngel.BuildTyp == DataStruct.BuildTypes.OUTPOST)
-                            buildingUpperAngle = (GameObjects.Buildings.Outpost)tmpEdge.UpperAngel.Building;
-                        else
-                            buildingUpperAngle = (GameObjects.Buildings.City)tmpEdge.UpperAngel.Building;
-                    }
-
-                    //Wenn an der unteren Ecke ein Gebäude existiert
-                    if (tmpEdge.LowerAngel.BuildTyp != DataStruct.BuildTypes.NONE)
-                    {
-                        if (tmpEdge.LowerAngel.BuildTyp == DataStruct.BuildTypes.OUTPOST)
-                            buildingLowerAngle = (GameObjects.Buildings.Outpost)tmpEdge.LowerAngel.Building;
-                        else
-                            buildingLowerAngle = (GameObjects.Buildings.City)tmpEdge.LowerAngel.Building;
-                    }
-
-                    switch (tmpEdge.BuildTyp)
-                    {
-                        case DataStruct.BuildTypes.NONE:
-                            tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
-                            //Wenn keine Gebäude oder nur ein Gebäude an dieser Kante existierem
-                            if (gameStage == GameStage.GameStages.PLAYER_STAGE_BUILD
-                                || gameStage == GameStage.GameStages.PLAYER_STAGE_DEAL)
-                            {
-                                if (buildingUpperAngle == null || buildingLowerAngle == null)
-                                {
-                                    //wenn eine eigene Hyperloop an der Kante angrenzt
-                                    //Obere Kanten prüfen
-                                    foreach (DataStruct.Edge element in tmpEdge.UpperAngel.Edges)
-                                    {
-                                        if (element.Building != null && element.PositionX != j && element.PositionY != i)
-                                        {
-                                            GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)element.Building;
-
-                                            if (hyperloop.PlayerID == currentPlayer.PlayerID)
-                                            {
-                                                tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
-                                                break;
-                                            }
-
-                                        }
-                                    }
-
-                                    //Untere Kanten prüfen
-                                    foreach (DataStruct.Edge element in tmpEdge.LowerAngel.Edges)
-                                    {
-                                        if (element.Building != null && element.PositionX != j && element.PositionY != i)
-                                        {
-                                            GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)element.Building;
-
-                                            if (hyperloop.PlayerID == currentPlayer.PlayerID)
-                                            {
-                                                tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
-                                                break;
-                                            }
-                                        }
-                                    }
-
-                                    if (tmpEdge.BuildStruct == DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP)
-                                        continue;
-                                }
-                                //Wenn an der oberen Ecke ein eigenes Gebäude existiert
-                                if (IsBuildingFromPlayer(buildingUpperAngle, currentPlayer))
-                                {
-                                    tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
-                                }
-
-                                //Wenn an der unteren Ecke ein eigenes Gebäude existiert
-                                if (IsBuildingFromPlayer(buildingLowerAngle, currentPlayer))
-                                {
-                                    tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
-                                }
-                            }
-                            else if (gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_ONE
-                                || gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_TWO)
-                            {
-                                if (IsBuildingFromPlayer(buildingUpperAngle, currentPlayer))
-                                {
-                                    int counter = 0;
-                                    foreach(DataStruct.Edge element in tmpEdge.UpperAngel.Edges)
-                                    {
-                                        if (element.Building != null)
-                                            counter++;
-                                    }
-
-                                    if(counter == 0)
-                                        tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
-                                }
-
-                                if (IsBuildingFromPlayer(buildingLowerAngle, currentPlayer))
-                                {
-                                    int counter = 0;
-                                    foreach (DataStruct.Edge element in tmpEdge.LowerAngel.Edges)
-                                    {
-                                        if (element.Building != null)
-                                            counter++;
-                                    }
-
-                                    if (counter == 0)
-                                        tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP;
-                                }
-
-                            }
 
 
-                                break;
-                        case DataStruct.BuildTypes.HYPERLOOP:
-                            tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
 
-                            break;
-                    }
-                }
-            }
-        }
-
-        private void ComputeGameRules()
-        {
-            if (CanSetStructCity() && CanSetStructOutpost())
-                checkAngles();
-
-            if (CanSetStructHyperloop())
-                checkEdges();
-        }
     }
 }
