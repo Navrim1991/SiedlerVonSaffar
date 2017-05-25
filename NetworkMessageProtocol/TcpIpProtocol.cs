@@ -8,7 +8,8 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
 {
     public class TcpIpProtocol
     {
-        private const int TCP_IP_PROTOCOL_DATA_PATTERN = 0x00000F00;
+        private const int TCP_IP_PROTOCOL_CLIENT_PATTERN = 0x00000F00;
+        private const int TCP_IP_PROTOCOL_SERVER_PATTERN = 0x00F00000;
 
         public readonly byte[] PLAYER_NAME;
         public readonly byte[] PLAYER_READY;
@@ -16,6 +17,7 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
         public readonly byte[] PLAYER_CONTAINER_DATA;
         public readonly byte[] PLAYER_ROLL_DICE;
         public readonly byte[] PLAYER_DEAL;
+        public readonly byte[] PLAYER_DATA;
 
         public readonly byte[] SERVER_PLAYER_DATA;
         public readonly byte[] SERVER_NEED_PLAYER_NAME;
@@ -37,13 +39,15 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
             SERVER_CONTAINER_DATA_OWN = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_CONTAINER_DATA_OWN);
             PLAYER_ROLL_DICE = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_ROLL_DICE);
             PLAYER_DEAL = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_DEAL);
-            SERVER_CONTAINER_DATA_OTHER = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_DEAL);
+            SERVER_CONTAINER_DATA_OTHER = BitConverter.GetBytes((int)TcpIpProtocolType.SERVER_CONTAINER_DATA_OTHER);
+            PLAYER_READY = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_READY);
+            PLAYER_DATA = BitConverter.GetBytes((int)TcpIpProtocolType.PLAYER_DATA);
         }
 
-        public bool isClientDataPattern(byte[] data)
+        public bool IsClientDataPattern(byte[] data)
         {
-            byte[] clientDataPatternBytes = BitConverter.GetBytes(TCP_IP_PROTOCOL_DATA_PATTERN);
-            int clientDataPatternBytesLength = clientDataPatternBytes.Length;
+            byte[] clientPatternBytes = BitConverter.GetBytes(TCP_IP_PROTOCOL_CLIENT_PATTERN);
+            int clientDataPatternBytesLength = clientPatternBytes.Length;
 
             if (data.Length < clientDataPatternBytesLength)
             {
@@ -54,7 +58,24 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
 
             byte[] clientDataProtocol = { 0, data[1], 0 , 0 };
 
-            return (BitConverter.ToInt32(clientDataProtocol, 0) == TCP_IP_PROTOCOL_DATA_PATTERN) ? true : false;            
+            return (BitConverter.ToInt32(clientDataProtocol, 0) == TCP_IP_PROTOCOL_CLIENT_PATTERN) ? true : false;            
+        }
+
+        public bool IsServerDataPattern(byte[] data)
+        {
+            byte[] serverPatternBytes = BitConverter.GetBytes(TCP_IP_PROTOCOL_SERVER_PATTERN);
+            int serverPatternBytesLength = serverPatternBytes.Length;
+
+            if (data.Length < serverPatternBytesLength)
+            {
+                Configuration.DeveloperParameter.PrintDebug("ClientDataPattern-Data is to small");
+
+                return false;
+            }
+
+            byte[] serverDataProtocol = { 0, 0, data[2], 0 };
+
+            return (5>>BitConverter.ToInt32(serverDataProtocol, 0) == 5>>TCP_IP_PROTOCOL_SERVER_PATTERN) ? true : false;
         }
     }
 }
