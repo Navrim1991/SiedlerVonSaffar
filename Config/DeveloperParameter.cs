@@ -16,6 +16,8 @@ namespace SiedlerVonSaffar.Configuration
         public static bool TcpEcho { get; internal set; }
         public static int ParamaterCount { get; private set; }
 
+        public static bool IsPrototyp { get; private set; }
+
         private static ConfigFileWatcher configFileWatcher;
 
         public static string CONFIG_FILE
@@ -31,6 +33,7 @@ namespace SiedlerVonSaffar.Configuration
             PrintDebugInfoToConsole = System.Diagnostics.Debugger.IsAttached ? true : false;
             DebuggerIsAttached = System.Diagnostics.Debugger.IsAttached;
             TcpEcho = true;
+            IsPrototyp = System.Diagnostics.Process.GetCurrentProcess().MainModule.ModuleName.Contains("Prototyp") ? true : false;
 
             Type developerParameterType = typeof(DeveloperParameter);
             PropertyInfo[] propertyInfoFields = developerParameterType.GetProperties(BindingFlags.Public | BindingFlags.Static);

@@ -19,7 +19,6 @@ namespace SiedlerVonSaffar.GameLogic
     public class GameLogic
     {
         private Queue<GameObjects.Player.Player> Players;
-        private short currentPlayerID = 0;
 
         private GameObjects.Player.Player currentPlayer;
 
@@ -53,6 +52,8 @@ namespace SiedlerVonSaffar.GameLogic
 
         public GameLogic()
         {
+
+            Configuration.DeveloperParameter.init();
             PlayersReady = 0;
             GameHasStarted = false;
             Players = new Queue<GameObjects.Player.Player>();
@@ -252,6 +253,8 @@ namespace SiedlerVonSaffar.GameLogic
             {
                 for (int j = 0; j < containerData.Hexagons.GetLength(1); j++)
                 {
+                    if (containerData.Hexagons[i, j] == null)
+                        continue;
                     if (containerData.Hexagons[i, j].HexagonID == (diceNumber))
                         hexagons.Add(containerData.Hexagons[i, j]);
                 }
@@ -265,7 +268,8 @@ namespace SiedlerVonSaffar.GameLogic
             
                 int countResources = 1;
 
-                if (angle.BuildTyp == DataStruct.BuildTypes.CITY)
+
+               if (angle.BuildTyp == DataStruct.BuildTypes.CITY)
                     countResources++;
 
                 if (hexagon.HexagonTyp == DataStruct.HexagonTypes.BIOMASS_FACTORY)
@@ -348,7 +352,6 @@ namespace SiedlerVonSaffar.GameLogic
                         if (currentPlayer.PlayerID == building.PlayerID)
                         {
                             HandelResources(currentPlayer, building, innerElement, element);
-                            continue;
                         }
 
                         foreach (GameObjects.Player.Player playerElement in Players)
@@ -356,7 +359,6 @@ namespace SiedlerVonSaffar.GameLogic
                             if (playerElement.PlayerID == building.PlayerID)
                             {
                                 HandelResources(playerElement, building, innerElement, element);
-                                break;
                             }
                         }
                     }
@@ -418,7 +420,8 @@ namespace SiedlerVonSaffar.GameLogic
 
             data = this.Serialize(tcpProtocol.SERVER_CONTAINER_DATA_OTHER, containerData);
 
-            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
+            if (!Configuration.DeveloperParameter.IsPrototyp)
+                TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
         }
 
         private void SerializePlayerData(GameObjects.Player.Player player)
@@ -429,7 +432,8 @@ namespace SiedlerVonSaffar.GameLogic
 
             //TODO make the proxy
 
-            TxQueue.Enqueue(new TransmitMessage(player.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
+            if(!Configuration.DeveloperParameter.IsPrototyp)
+                TxQueue.Enqueue(new TransmitMessage(player.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
         }
 
         private void DeserializeContainerData(byte[] data)
@@ -846,13 +850,20 @@ namespace SiedlerVonSaffar.GameLogic
             }
         }
 
-        private void ComputeGameRules()
+        private bool ComputeGameRules()
         {
-            if (CanSetStructCity() && CanSetStructOutpost())
+            bool canSetStructCity = CanSetStructCity();
+            bool canSetStructOutpost = CanSetStructOutpost();
+            bool canSetStructHyperloop = CanSetStructHyperloop();
+
+
+            if (canSetStructCity && canSetStructOutpost)
                 checkAngles();
 
-            if (CanSetStructHyperloop())
+            if (canSetStructHyperloop)
                 checkEdges();
+
+            return (canSetStructCity || canSetStructOutpost) || canSetStructHyperloop;
         }
 
         #endregion
@@ -930,16 +941,19 @@ namespace SiedlerVonSaffar.GameLogic
 
                                             for(int i = 0; i < Players.Count; i++)
                                             {
-                                                GameObjects.Player.Player tmp = Players.Peek();
+                                                GameObjects.Player.Player tmp = Players.Dequeue();
 
                                                 if (tmp.ClientIP.Address.ToString() == message.ClientIP.Address.ToString())
                                                 {
-                                                    currentPlayer = Players.Dequeue();
+                                                    if (currentPlayer != null)
+                                                        Players.Enqueue(currentPlayer);
+
+                                                    currentPlayer = tmp;
                                                     break;
                                                 }                                                    
                                                 else
                                                 {
-                                                    Players.Enqueue(Players.Dequeue());
+                                                    Players.Enqueue(tmp);
                                                 }                                                
                                             }
                                         }    
@@ -1028,15 +1042,11 @@ namespace SiedlerVonSaffar.GameLogic
 
                                             HandleResources(hexagons);
 
-                                            nextPlayer();
-
                                             gameStage = GameStage.GameStages.PLAYER_STAGE_ROLL_DICE;
 
                                             ComputeGameRules();
 
-                                            SerializeContainerData();
-
-                                            
+                                            SerializeContainerData();                             
                                         }
                                     }
                                     else if (tcpProtocol.PLAYER_DATA.SequenceEqual(equalBytes))
@@ -1057,10 +1067,15 @@ namespace SiedlerVonSaffar.GameLogic
                         case GameStage.GameStages.PLAYER_STAGE_BUILD:
                             if (rxObject is RecieveMessage)
                             {
+                                
+
                                 RecieveMessage message = (RecieveMessage)rxObject;
 
                                 if (tcpProtocol.IsClientDataPattern(message.Data))
                                 {
+
+                                    int a = RxQueue.Count;
+
                                     byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
 
                                     if (tcpProtocol.PLAYER_CONTAINER_DATA.SequenceEqual(equalBytes))
@@ -1070,6 +1085,13 @@ namespace SiedlerVonSaffar.GameLogic
                                         ComputeGameRules();
 
                                         SerializeContainerData();
+                                    }
+                                    else if (tcpProtocol.PLAYER_DATA.SequenceEqual(equalBytes))
+                                    {
+                                        GameObjects.Player.Player tmp = HandelPlayerData(message.Data);
+
+                                        if (currentPlayer.ClientIP.Address.ToString() == tmp.ClientIP.Address.ToString())
+                                            currentPlayer = tmp;
                                     }
                                     else if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
                                     {
@@ -1089,31 +1111,45 @@ namespace SiedlerVonSaffar.GameLogic
                             
                             if (rxObject is RecieveMessage)
                             {
+                                
+
                                 RecieveMessage message = (RecieveMessage)rxObject;
 
                                 if (tcpProtocol.IsClientDataPattern(message.Data))
                                 {
+
+                                    int a = RxQueue.Count;
+
                                     byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
 
                                     if (tcpProtocol.PLAYER_DEAL.SequenceEqual(equalBytes))
                                     {
                                         HandleDeal(message.Data);
                                     }
+                                    else if (tcpProtocol.PLAYER_DATA.SequenceEqual(equalBytes))
+                                    {
+                                        GameObjects.Player.Player tmp = HandelPlayerData(message.Data);
+
+                                        if (currentPlayer.ClientIP.Address.ToString() == tmp.ClientIP.Address.ToString())
+                                            currentPlayer = tmp;
+                                    }
                                     else if (tcpProtocol.PLAYER_CONTAINER_DATA.SequenceEqual(equalBytes))
                                     {
                                         DeserializeContainerData(message.Data);
-
-                                        gameStage = GameStage.GameStages.PLAYER_STAGE_BUILD;
-                                    }
-                                    else if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
-                                    {
-                                        nextPlayer();
 
                                         ComputeGameRules();
 
                                         SerializeContainerData();
 
-                                        gameStage = GameStage.GameStages.PLAYER_STAGE_ROLL_DICE;
+                                        gameStage = GameStage.GameStages.PLAYER_STAGE_BUILD;
+                                    }
+                                    else if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
+                                    {
+                                        ComputeGameRules();
+
+                                        SerializeContainerData();
+
+                                        gameStage = GameStage.GameStages.PLAYER_STAGE_BUILD;
                                     }
                                 }
                             }
