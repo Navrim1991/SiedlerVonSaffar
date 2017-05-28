@@ -10,6 +10,7 @@ using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Net.Sockets;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -35,6 +36,8 @@ namespace SiedlerVonSaffar.GameLogic
         private Thread gameLogicThread;
         private TcpIpProtocol tcpProtocol;
         private GameStage.GameStages gameStage;
+        private bool playerPlayedProgressCardSteet;
+        private int roundCounter;
 
         private readonly short COUNT_RESOURCE_CARDS = 24;
 
@@ -44,6 +47,9 @@ namespace SiedlerVonSaffar.GameLogic
         private int ResourceCardsFriendlyAlien { get; set; }
         private int ResourceCardsTitan { get; set; }
 
+
+        private List<GameObjects.Menu.Cards.Progress.ProgressCard> ProgressCards { get; set; }
+
         public short PlayersReady { get; set; }
         public bool GameHasStarted { get; set; }
 
@@ -52,7 +58,8 @@ namespace SiedlerVonSaffar.GameLogic
 
         public GameLogic()
         {
-
+            playerPlayedProgressCardSteet = false;
+            roundCounter = 1;
             Configuration.DeveloperParameter.init();
             PlayersReady = 0;
             GameHasStarted = false;
@@ -64,6 +71,27 @@ namespace SiedlerVonSaffar.GameLogic
             gameLogicThread = new Thread(gameLogicThreadStart);
             gameLogicThread.Name = "GameLogic";
             tcpProtocol = new TcpIpProtocol();
+            ProgressCards = new List<GameObjects.Menu.Cards.Progress.ProgressCard>();
+
+            int i;
+
+            for (i = 0; i < 14; i++)
+                ProgressCards.Add(new GameObjects.Menu.Cards.Progress.SpaceMarine());
+
+            for (i = 0; i < 2; i++)
+            {
+                ProgressCards.Add(new GameObjects.Menu.Cards.Progress.Hyperloop());
+                ProgressCards.Add(new GameObjects.Menu.Cards.Progress.Monopoly());
+                ProgressCards.Add(new GameObjects.Menu.Cards.Progress.Invention());
+            }
+
+            ProgressCards.Add(new GameObjects.Menu.Cards.Progress.Library());
+            ProgressCards.Add(new GameObjects.Menu.Cards.Progress.SpaceHarbor());
+            ProgressCards.Add(new GameObjects.Menu.Cards.Progress.ResearchInstitute());
+            ProgressCards.Add(new GameObjects.Menu.Cards.Progress.Senate());
+            ProgressCards.Add(new GameObjects.Menu.Cards.Progress.Temple());
+
+            Shuffle(ProgressCards);
 
             this.ResourceCardsBiomass = COUNT_RESOURCE_CARDS;
             this.ResourceCardsCarbonFibres = COUNT_RESOURCE_CARDS;
@@ -72,6 +100,23 @@ namespace SiedlerVonSaffar.GameLogic
             this.ResourceCardsTitan = COUNT_RESOURCE_CARDS;
 
             gameLogicThread.Start();
+        }
+
+        private void Shuffle(List<GameObjects.Menu.Cards.Progress.ProgressCard> list)
+        {
+            RNGCryptoServiceProvider provider = new RNGCryptoServiceProvider();
+            int n = list.Count;
+            while (n > 1)
+            {
+                byte[] box = new byte[1];
+                do provider.GetBytes(box);
+                while (!(box[0] < n * (Byte.MaxValue / n)));
+                int k = (box[0] % n);
+                n--;
+                GameObjects.Menu.Cards.Progress.ProgressCard value = list[k];
+                list[k] = list[n];
+                list[n] = value;
+            }
         }
 
         #region Threading
@@ -86,6 +131,382 @@ namespace SiedlerVonSaffar.GameLogic
         #endregion
 
         #region Handle Data
+
+        private void HandleBandit()
+        {
+            //TODO nur tempoärer nachher müssen die spieler ihre Rostoffkarten selbst auswählen
+            Random rnd = new Random();
+            double resourceCount = 0;
+
+            foreach (GameObjects.Player.Player element in Players)
+            {
+                resourceCount = 0;
+                resourceCount += element.ResourceCardsBiomass;
+                resourceCount += element.ResourceCardsCarbonFibres;
+                resourceCount += element.ResourceCardsDeuterium;
+                resourceCount += element.ResourceCardsFriendlyAlien;
+                resourceCount += element.ResourceCardsTitan;
+
+
+                if (resourceCount > 7)
+                {
+                    resourceCount = Math.Ceiling(resourceCount / 2);
+
+                    for (int i = 0; i < resourceCount; i++)
+                    {
+                        switch (rnd.Next(1, 5))
+                        {
+                            case 1:
+                                if (element.ResourceCardsBiomass > 0)
+                                    element.ResourceCardsBiomass--;
+                                break;
+                            case 2:
+                                if (element.ResourceCardsCarbonFibres > 0)
+                                    element.ResourceCardsCarbonFibres--;
+
+                                break;
+                            case 3:
+                                if (element.ResourceCardsFriendlyAlien > 0)
+                                    element.ResourceCardsFriendlyAlien--;
+
+                                break;
+                            case 4:
+                                if (element.ResourceCardsDeuterium > 0)
+                                    element.ResourceCardsDeuterium--;
+                                break;
+                            case 5:
+                                if (element.ResourceCardsTitan > 0)
+                                    element.ResourceCardsTitan--;
+                                break;
+                        }
+                    }
+
+                    SerializePlayerData(element);
+                }
+            }
+
+            resourceCount = 0;
+            resourceCount += CurrentPlayer.ResourceCardsBiomass;
+            resourceCount += CurrentPlayer.ResourceCardsCarbonFibres;
+            resourceCount += CurrentPlayer.ResourceCardsDeuterium;
+            resourceCount += CurrentPlayer.ResourceCardsFriendlyAlien;
+            resourceCount += CurrentPlayer.ResourceCardsTitan;
+
+
+            if (resourceCount > 7)
+            {
+                resourceCount = Math.Ceiling(resourceCount / 2);
+
+                for (int i = 0; i < resourceCount; i++)
+                {
+                    switch (rnd.Next(1, 5))
+                    {
+                        case 1:
+                            if (CurrentPlayer.ResourceCardsBiomass > 0)
+                                CurrentPlayer.ResourceCardsBiomass--;
+                            break;
+                        case 2:
+                            if (CurrentPlayer.ResourceCardsCarbonFibres > 0)
+                                CurrentPlayer.ResourceCardsCarbonFibres--;
+
+                            break;
+                        case 3:
+                            if (CurrentPlayer.ResourceCardsFriendlyAlien > 0)
+                                CurrentPlayer.ResourceCardsFriendlyAlien--;
+
+                            break;
+                        case 4:
+                            if (CurrentPlayer.ResourceCardsDeuterium > 0)
+                                CurrentPlayer.ResourceCardsDeuterium--;
+                            break;
+                        case 5:
+                            if (CurrentPlayer.ResourceCardsTitan > 0)
+                                CurrentPlayer.ResourceCardsTitan--;
+                            break;
+                    }
+                }
+
+                SerializePlayerData(CurrentPlayer);
+            }
+
+            DataStruct.Hexagon banditHexagon = null;
+
+            for (int i = 0; i < containerData.Hexagons.GetLength(0); i++)
+            {
+                for (int j = 0; j < containerData.Hexagons.GetLength(1); j++)
+                {
+                    if (containerData.Hexagons[i, j] == null)
+                        continue;
+
+                    if (containerData.Hexagons[i, j].HasBandit)
+                    {
+                        banditHexagon = containerData.Hexagons[i, j];
+                        break;
+                    }
+                }
+
+                if (banditHexagon != null)
+                    break;
+            }
+
+            bool flag = true;
+            int counter = 1;
+
+
+            foreach (DataStruct.Angle element in banditHexagon.Angles)
+            {
+                if (element == null)
+                    continue;
+
+                if (element.Building != null && element.Building.PlayerID != CurrentPlayer.PlayerID)
+                {
+                    GameObjects.Player.Player stealedPlayer = (from p in Players where p.PlayerID == element.Building.PlayerID select p).First();
+
+                    while (flag && counter < 20)
+                    {
+                        switch (rnd.Next(1, 5))
+                        {
+                            case 1:
+                                if (stealedPlayer.ResourceCardsBiomass > 0)
+                                {
+                                    currentPlayer.ResourceCardsBiomass++;
+                                    stealedPlayer.ResourceCardsBiomass--;
+                                    flag = false;
+                                }
+                                break;
+                            case 2:
+                                if (stealedPlayer.ResourceCardsCarbonFibres > 0)
+                                {
+                                    currentPlayer.ResourceCardsCarbonFibres++;
+                                    stealedPlayer.ResourceCardsCarbonFibres--;
+                                    flag = false;
+                                }
+                                break;
+                            case 3:
+                                if (stealedPlayer.ResourceCardsFriendlyAlien > 0)
+                                {
+                                    currentPlayer.ResourceCardsFriendlyAlien++;
+                                    stealedPlayer.ResourceCardsFriendlyAlien--;
+                                    flag = false;
+                                }
+
+
+                                break;
+                            case 4:
+                                if (stealedPlayer.ResourceCardsDeuterium > 0)
+                                {
+                                    currentPlayer.ResourceCardsDeuterium++;
+                                    stealedPlayer.ResourceCardsDeuterium--;
+                                    flag = false;
+                                }
+                                break;
+                            case 5:
+                                if (stealedPlayer.ResourceCardsTitan > 0)
+                                {
+                                    CurrentPlayer.ResourceCardsTitan++;
+                                    stealedPlayer.ResourceCardsTitan--;
+                                    flag = false;
+                                }
+
+                                break;
+                        }
+
+                        counter++;
+                    }
+
+                    if (!flag)
+                    {
+                        SerializePlayerData(stealedPlayer);
+                        SerializePlayerData(currentPlayer);
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void HandleProgressCardHyperloop()
+        {
+            CheckEdges();
+
+            SerializeContainerData();
+
+            playerPlayedProgressCardSteet = true;
+        }
+
+        private void HandleProgressCardMonopoly(GameObjects.Menu.Cards.Progress.Monopoly monopoly)
+        {
+            if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.Biomass)
+            {
+                foreach (GameObjects.Player.Player element in Players)
+                {
+                    currentPlayer.ResourceCardsBiomass += element.ResourceCardsBiomass;
+                    element.ResourceCardsBiomass = 0;
+
+                    SerializePlayerData(element);
+                }
+
+                SerializePlayerData(currentPlayer);
+
+            }
+            else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.CarbonFibres)
+            {
+                foreach (GameObjects.Player.Player element in Players)
+                {
+                    currentPlayer.ResourceCardsCarbonFibres += element.ResourceCardsCarbonFibres;
+                    element.ResourceCardsCarbonFibres = 0;
+
+                    SerializePlayerData(element);
+                }
+
+                SerializePlayerData(currentPlayer);
+            }
+            else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.Deuterium)
+            {
+                foreach (GameObjects.Player.Player element in Players)
+                {
+                    currentPlayer.ResourceCardsDeuterium += element.ResourceCardsDeuterium;
+                    element.ResourceCardsDeuterium = 0;
+
+                    SerializePlayerData(element);
+                }
+
+                SerializePlayerData(currentPlayer);
+            }
+            else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.FriendlyAlien)
+            {
+                foreach (GameObjects.Player.Player element in Players)
+                {
+                    currentPlayer.ResourceCardsFriendlyAlien += element.ResourceCardsFriendlyAlien;
+                    element.ResourceCardsFriendlyAlien = 0;
+
+                    SerializePlayerData(element);
+                }
+
+                SerializePlayerData(currentPlayer);
+            }
+            else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.Titan)
+            {
+                foreach (GameObjects.Player.Player element in Players)
+                {
+                    currentPlayer.ResourceCardsTitan += element.ResourceCardsTitan;
+                    element.ResourceCardsTitan = 0;
+
+                    SerializePlayerData(element);
+                }
+
+                SerializePlayerData(currentPlayer);
+            }
+        }
+
+        private void HandleProgressCardInvention(GameObjects.Menu.Cards.Progress.Invention invention)
+        {
+            if (invention.ResourceCard is GameObjects.Menu.Cards.Resources.Biomass)
+            {
+                currentPlayer.ResourceCardsBiomass += 2;
+                ResourceCardsBiomass -= 2;
+
+                SerializePlayerData(currentPlayer);
+
+            }
+            else if (invention.ResourceCard is GameObjects.Menu.Cards.Resources.CarbonFibres)
+            {
+                currentPlayer.ResourceCardsCarbonFibres += 2;
+                ResourceCardsCarbonFibres -= 2;
+
+                SerializePlayerData(currentPlayer);
+            }
+            else if (invention.ResourceCard is GameObjects.Menu.Cards.Resources.Deuterium)
+            {
+                currentPlayer.ResourceCardsDeuterium += 2;
+                ResourceCardsDeuterium -= 2;
+
+                SerializePlayerData(currentPlayer);
+            }
+            else if (invention.ResourceCard is GameObjects.Menu.Cards.Resources.FriendlyAlien)
+            {
+                currentPlayer.ResourceCardsFriendlyAlien += 2;
+                ResourceCardsFriendlyAlien -= 2;
+
+                SerializePlayerData(currentPlayer);
+            }
+            else if (invention.ResourceCard is GameObjects.Menu.Cards.Resources.Titan)
+            {
+                currentPlayer.ResourceCardsTitan += 2;
+                ResourceCardsTitan -= 2;
+
+                SerializePlayerData(currentPlayer);
+            }
+        }
+
+        private void HandleProgresscardSpaceMarine()
+        {
+            List<GameObjects.Menu.Cards.Progress.ProgressCard> cards = (from p in currentPlayer.PlayedProgressCards where p.GetType() == typeof(GameObjects.Menu.Cards.Progress.SpaceMarine) select p).ToList();
+
+            if (cards.Count > 3)
+            {
+                foreach (GameObjects.Menu.Cards.Victory.VictoryCard element in CurrentPlayer.VictoryCards)
+                {
+                    if (element is GameObjects.Menu.Cards.Victory.SpaceMarine)
+                        return;
+                }
+
+                GameObjects.Menu.Cards.Victory.VictoryCard tmp = null;
+
+                foreach (GameObjects.Player.Player element in Players)
+                {
+                    foreach (GameObjects.Menu.Cards.Victory.VictoryCard innerElement in element.VictoryCards)
+                    {
+                        if (innerElement is GameObjects.Menu.Cards.Victory.SpaceMarine)
+                            tmp = innerElement;
+                    }
+
+                    if (tmp != null)
+                    {
+                        element.VictoryCards.Remove(tmp);
+
+                        SerializePlayerData(element);
+
+                        break;
+                    }
+                }
+
+                currentPlayer.VictoryCards.Add(new GameObjects.Menu.Cards.Victory.SpaceMarine());
+
+                SerializePlayerData(currentPlayer);
+
+            }
+
+            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, tcpProtocol.SERVER_SET_BANDIT, TransmitMessage.TransmitTyps.TO_OWN));
+        }
+
+        private void HandleProgressCards(byte[] data)
+        {
+            GameObjects.Menu.Cards.Progress.ProgressCard card = (GameObjects.Menu.Cards.Progress.ProgressCard)Deserialize(data);
+
+            currentPlayer.PlayedProgressCards.Add(card);
+
+            card = (from p in currentPlayer.ProgressCards where p.GetType() == card.GetType() select p).First();
+
+            currentPlayer.ProgressCards.Remove(card);
+
+            if (card is GameObjects.Menu.Cards.Progress.Hyperloop)
+            {
+                HandleProgressCardHyperloop();
+            }
+            else if (card is GameObjects.Menu.Cards.Progress.Monopoly)
+            {
+                HandleProgressCardMonopoly((GameObjects.Menu.Cards.Progress.Monopoly)card);
+            }
+            else if (card is GameObjects.Menu.Cards.Progress.Invention)
+            {
+                HandleProgressCardInvention((GameObjects.Menu.Cards.Progress.Invention)card);
+            }
+            else if (card is GameObjects.Menu.Cards.Progress.SpaceMarine)
+            {
+                HandleProgresscardSpaceMarine();
+            }
+        }
 
         private void HandleDeal(byte[] dealData)
         {
@@ -255,7 +676,7 @@ namespace SiedlerVonSaffar.GameLogic
                 {
                     if (containerData.Hexagons[i, j] == null)
                         continue;
-                    if (containerData.Hexagons[i, j].HexagonID == (diceNumber))
+                    if (containerData.Hexagons[i, j].HexagonID == (diceNumber) && !containerData.Hexagons[i, j].HasBandit)
                         hexagons.Add(containerData.Hexagons[i, j]);
                 }
             }
@@ -447,6 +868,35 @@ namespace SiedlerVonSaffar.GameLogic
 
         #region Workaround Methods
 
+        private int CheckVictory(GameObjects.Player.Player player)
+        {
+            int points = (from p in player.PlayedProgressCards where p.GetType() == typeof(SiedlerVonSaffar.GameObjects.Menu.Cards.Progress.VictoryPoint) select p).Count();
+
+            points += player.VictoryCards.Count * 2;
+
+            for(int i = 0; i < containerData.Angles.GetLength(0); i++)
+            {
+                for (int j = 0; j < containerData.Angles.GetLength(1); j++)
+                {
+                    if (containerData.Angles[i, j] == null)
+                        continue;
+
+                    DataStruct.Angle tmpAngle = containerData.Angles[i, j];
+
+                    if(tmpAngle.Building != null && tmpAngle.Building.PlayerID == player.PlayerID)
+                    {
+                        if (tmpAngle.BuildTyp == DataStruct.BuildTypes.CITY)
+                            points += 2;
+                        else
+                            points++;
+                    }
+                }
+            }
+
+
+            return points;
+        }
+
         private void ResetContainerDataBuildStruct()
         {
             DataStruct.Angle[,] angles = this.containerData.Angles;
@@ -497,10 +947,7 @@ namespace SiedlerVonSaffar.GameLogic
         }
 
         private void FoundationStages(ref int foundationStageRoundCounter)
-        {
-            
-
-
+        {         
             if (foundationStageRoundCounter % 2 == 0)
             {
                 checkAngles();
@@ -516,7 +963,7 @@ namespace SiedlerVonSaffar.GameLogic
             }
             else
             {
-                checkEdges();
+                CheckEdges();
 
                 foundationStageRoundCounter++;
 
@@ -622,7 +1069,6 @@ namespace SiedlerVonSaffar.GameLogic
                 || gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_ONE
                 || gameStage == GameStage.GameStages.FOUNDATION_STAGE_ROUND_TWO)
             {
-                int buildingCounter = 0;
 
                 for (int i = 0; i < angles.GetLength(0); i++)
                 {
@@ -673,7 +1119,7 @@ namespace SiedlerVonSaffar.GameLogic
                                 {
                                     if (element.Building != null)
                                     {
-                                        GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)tmpAngle.Building;
+                                        GameObjects.Buildings.Hyperloop hyperloop = (GameObjects.Buildings.Hyperloop)element.Building;
 
                                         //Wenn eine Kante eine Eigene Straße beinhaltet darf eine Außenposten gebaut werden
                                         if (hyperloop.PlayerID == currentPlayer.PlayerID)
@@ -713,7 +1159,7 @@ namespace SiedlerVonSaffar.GameLogic
             return false;
         }
 
-        private void checkEdges()
+        private void CheckEdges()
         {
             DataStruct.DataStruct[,] edges = containerData.Data;
 
@@ -757,7 +1203,8 @@ namespace SiedlerVonSaffar.GameLogic
                             tmpEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
                             //Wenn keine Gebäude oder nur ein Gebäude an dieser Kante existierem
                             if (gameStage == GameStage.GameStages.PLAYER_STAGE_BUILD
-                                || gameStage == GameStage.GameStages.PLAYER_STAGE_DEAL)
+                                || gameStage == GameStage.GameStages.PLAYER_STAGE_DEAL
+                                || gameStage == GameStage.GameStages.PLAYER_STAGE_ROLL_DICE)
                             {
                                 if (buildingUpperAngle == null || buildingLowerAngle == null)
                                 {
@@ -857,11 +1304,11 @@ namespace SiedlerVonSaffar.GameLogic
             bool canSetStructHyperloop = CanSetStructHyperloop();
 
 
-            if (canSetStructCity && canSetStructOutpost)
+            if (canSetStructCity || canSetStructOutpost)
                 checkAngles();
 
             if (canSetStructHyperloop)
-                checkEdges();
+                CheckEdges();
 
             return (canSetStructCity || canSetStructOutpost) || canSetStructHyperloop;
         }
@@ -995,6 +1442,8 @@ namespace SiedlerVonSaffar.GameLogic
                                         {
                                             gameStage = GameStage.GameStages.FOUNDATION_STAGE_ROUND_TWO;
 
+                                            roundCounter++;
+
                                             foundationStageRoundCounter = 1;                                            
                                         }
                                     }
@@ -1036,7 +1485,8 @@ namespace SiedlerVonSaffar.GameLogic
                                             {
                                                 for (int j = 0; j < containerData.Hexagons.GetLength(1); j++)
                                                 {
-                                                    hexagons.Add(containerData.Hexagons[i, j]);
+                                                    if(containerData.Hexagons[i, j] != null && !containerData.Hexagons[i,j].HasBandit)
+                                                        hexagons.Add(containerData.Hexagons[i, j]);
                                                 }
                                             }
 
@@ -1046,7 +1496,7 @@ namespace SiedlerVonSaffar.GameLogic
 
                                             ComputeGameRules();
 
-                                            SerializeContainerData();                             
+                                            SerializeContainerData();
                                         }
                                     }
                                     else if (tcpProtocol.PLAYER_DATA.SequenceEqual(equalBytes))
@@ -1080,18 +1530,47 @@ namespace SiedlerVonSaffar.GameLogic
 
                                     if (tcpProtocol.PLAYER_CONTAINER_DATA.SequenceEqual(equalBytes))
                                     {
-                                        DeserializeContainerData(message.Data);
+                                        DeserializeContainerData(message.Data);                   
 
-                                        ComputeGameRules();
+                                        if (playerPlayedProgressCardSteet)
+                                        {
+                                            CheckEdges();
 
-                                        SerializeContainerData();
+                                            playerPlayedProgressCardSteet = false;
+
+                                            SerializeContainerData();
+                                        }
+                                        else
+                                        {
+                                            int points = CheckVictory(currentPlayer);
+
+                                            if (points >= 10)
+                                            {
+                                                //TODO VICTORY
+                                                //ANDERE PLAYER ZÄHLEN
+                                            }
+                                            else
+                                            {
+                                                ComputeGameRules();
+
+                                                SerializeContainerData();
+                                            }
+                                        }
+                                            
                                     }
                                     else if (tcpProtocol.PLAYER_DATA.SequenceEqual(equalBytes))
                                     {
                                         GameObjects.Player.Player tmp = HandelPlayerData(message.Data);
 
-                                        if (currentPlayer.ClientIP.Address.ToString() == tmp.ClientIP.Address.ToString())
+                                        if (currentPlayer.PlayerID== tmp.PlayerID)
                                             currentPlayer = tmp;
+                                        else
+                                        {
+                                            GameObjects.Player.Player tmp2 = (from p in Players where p.PlayerID == tmp.PlayerID select p).FirstOrDefault();
+
+                                            if (tmp2 != null)
+                                                tmp2 = tmp;
+                                        }
                                     }
                                     else if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
                                     {
@@ -1102,6 +1581,43 @@ namespace SiedlerVonSaffar.GameLogic
                                         SerializeContainerData();
 
                                         gameStage = GameStage.GameStages.PLAYER_STAGE_ROLL_DICE;
+                                    }
+                                    else if (tcpProtocol.PLAYER_BUY_PROGRESS_CARD.SequenceEqual(equalBytes))
+                                    {
+                                        if (PlayerCanBuyProgressCard() && ProgressCards.Count > 0)
+                                        {
+                                            currentPlayer.ProgressCards.Add(ProgressCards.Last());
+
+                                            currentPlayer.ProgressCards.Last().Round = roundCounter;
+
+                                            ProgressCards.Remove(ProgressCards.Last());
+
+                                            SerializePlayerData(currentPlayer);
+                                        }
+                                        else
+                                        {
+                                            byte[] error = Serialize(tcpProtocol.SERVER_ERROR, "Du hast zu weniger Ressourcen um eine Entwicklungskarte zu kaufen");
+
+                                            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, error, TransmitMessage.TransmitTyps.TO_OWN));
+                                        }
+                                    }
+                                    else if (tcpProtocol.PLAYER_PLAY_PROGRESS_CARD.SequenceEqual(equalBytes))
+                                    {
+                                        HandleProgressCards(message.Data);
+
+                                        int points = CheckVictory(currentPlayer);
+
+                                        if (points > 10)
+                                        {
+                                            //TODO VICTORY
+                                            //ANDERE PLAYER ZÄHLEN
+                                        }
+                                    }
+                                    else if (tcpProtocol.PLAYER_SET_BANDIT.SequenceEqual(equalBytes))
+                                    {
+                                        DeserializeContainerData(message.Data);
+
+                                        HandleBandit();
                                     }
                                 }
                             }
@@ -1132,16 +1648,44 @@ namespace SiedlerVonSaffar.GameLogic
 
                                         if (currentPlayer.ClientIP.Address.ToString() == tmp.ClientIP.Address.ToString())
                                             currentPlayer = tmp;
+                                        else
+                                        {
+                                            GameObjects.Player.Player tmp2 = (from p in Players where p.ClientIP.Address.ToString() == tmp.ClientIP.Address.ToString() select p).FirstOrDefault();
+
+                                            if (tmp2 != null)
+                                                tmp2 = tmp;
+                                        }
                                     }
                                     else if (tcpProtocol.PLAYER_CONTAINER_DATA.SequenceEqual(equalBytes))
                                     {
                                         DeserializeContainerData(message.Data);
 
-                                        ComputeGameRules();
+                                        if (playerPlayedProgressCardSteet)
+                                        {
+                                            CheckEdges();
 
-                                        SerializeContainerData();
+                                            playerPlayedProgressCardSteet = false;
 
-                                        gameStage = GameStage.GameStages.PLAYER_STAGE_BUILD;
+                                            SerializeContainerData();
+                                        }
+                                        else
+                                        {
+                                            int points = CheckVictory(currentPlayer);
+
+                                            if (points >= 10)
+                                            {
+                                                //TODO VICTORY
+                                                //ANDERE PLAYER ZÄHLEN
+                                            }
+                                            else
+                                            {
+                                                ComputeGameRules();
+
+                                                SerializeContainerData();
+
+                                                gameStage = GameStage.GameStages.PLAYER_STAGE_BUILD;
+                                            }
+                                        }
                                     }
                                     else if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
                                     {
@@ -1151,9 +1695,46 @@ namespace SiedlerVonSaffar.GameLogic
 
                                         gameStage = GameStage.GameStages.PLAYER_STAGE_BUILD;
                                     }
+                                    else if (tcpProtocol.PLAYER_BUY_PROGRESS_CARD.SequenceEqual(equalBytes))
+                                    {
+                                        if (PlayerCanBuyProgressCard() && ProgressCards.Count > 0)
+                                        {
+                                            currentPlayer.ProgressCards.Add(ProgressCards.Last());
+
+                                            currentPlayer.ProgressCards.Last().Round = roundCounter;
+
+                                            ProgressCards.Remove(ProgressCards.Last());
+
+                                            SerializePlayerData(currentPlayer);
+                                        }
+                                        else
+                                        {
+                                            byte[] error = Serialize(tcpProtocol.SERVER_ERROR, "Du hast zu weniger Ressourcen um eine Entwicklungskarte zu kaufen");
+
+                                            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, error, TransmitMessage.TransmitTyps.TO_OWN));
+                                        }
+                                    }
+                                    else if (tcpProtocol.PLAYER_PLAY_PROGRESS_CARD.SequenceEqual(equalBytes))
+                                    {
+                                        HandleProgressCards(message.Data);
+
+                                        int points = CheckVictory(currentPlayer);
+
+                                        if (points > 10)
+                                        {
+                                            //TODO VICTORY
+                                            //ANDERE PLAYER ZÄHLEN
+                                        }
+                                    }
+                                    else if (tcpProtocol.PLAYER_SET_BANDIT.SequenceEqual(equalBytes))
+                                    {
+                                        DeserializeContainerData(message.Data);
+
+                                        HandleBandit();
+                                    }
                                 }
                             }
-                                        break;
+                            break;
                         case GameStage.GameStages.PLAYER_STAGE_ROLL_DICE:
                             if (rxObject is RecieveMessage)
                             {
@@ -1165,13 +1746,58 @@ namespace SiedlerVonSaffar.GameLogic
 
                                     if (tcpProtocol.PLAYER_ROLL_DICE.SequenceEqual(equalBytes))
                                     {
+                                        roundCounter++;
+
                                         int number = (int)Deserialize(message.Data);
 
-                                        HandleRollDice(number);
+                                        //TODO 7 gewürfelt;
+                                        if (number != 7)
+                                        {
+                                            HandleRollDice(number);
+
+                                            ComputeGameRules();
+
+                                            SerializeContainerData();
+                                        }                                            
+                                        else
+                                            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, tcpProtocol.SERVER_SET_BANDIT, TransmitMessage.TransmitTyps.TO_OWN));
 
                                         gameStage = GameStage.GameStages.PLAYER_STAGE_DEAL;
                                     }
+                                    else if (tcpProtocol.PLAYER_BUY_PROGRESS_CARD.SequenceEqual(equalBytes))
+                                    {
+                                        if(PlayerCanBuyProgressCard() && ProgressCards.Count > 0)
+                                        {
+                                            currentPlayer.ProgressCards.Add(ProgressCards.Last());
+
+                                            currentPlayer.ProgressCards.Last().Round = roundCounter;
+
+                                            ProgressCards.Remove(ProgressCards.Last());
+
+                                            SerializePlayerData(currentPlayer);
+                                        }
+                                        else
+                                        {
+                                            byte[] error = Serialize(tcpProtocol.SERVER_ERROR, "Du hast zu weniger Ressourcen um eine Entwicklungskarte zu kaufen");
+
+                                            TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, error, TransmitMessage.TransmitTyps.TO_OWN));
+                                        }
+                                    }
+                                    else if(tcpProtocol.PLAYER_PLAY_PROGRESS_CARD.SequenceEqual(equalBytes))
+                                    {
+                                        HandleProgressCards(message.Data);
+
+                                        int points = CheckVictory(currentPlayer);
+
+                                        if(points > 10)
+                                        {
+                                            //TODO VICTORY
+                                            //ANDERE PLAYER ZÄHLEN
+                                        }
+                                    }
+                                    
                                 }
+                                
                             }
 
                             break;
@@ -1208,7 +1834,13 @@ namespace SiedlerVonSaffar.GameLogic
             }
         }
 
+        public bool PlayerCanBuyProgressCard()
+        {
+            if (currentPlayer.ResourceCardsTitan > 0 && currentPlayer.ResourceCardsFriendlyAlien > 0 && currentPlayer.ResourceCardsBiomass > 0)
+                return true;
 
+            return false;
+        }
 
 
 

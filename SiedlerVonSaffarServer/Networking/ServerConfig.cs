@@ -27,7 +27,9 @@ namespace SiedlerVonSaffar.Networking
 #pragma warning restore CS0618 // Typ oder Element ist veraltet
             HostIpAddress = HostIpInfo.AddressList[1];
 
+#pragma warning disable CS0618 // Typ oder Element ist veraltet
             DeveloperParameter.PrintDebug("Server configurated with host-IP: \n\r\t" + HostIpAddress.Address.ToString());
+#pragma warning restore CS0618 // Typ oder Element ist veraltet
         }
     }
 }
