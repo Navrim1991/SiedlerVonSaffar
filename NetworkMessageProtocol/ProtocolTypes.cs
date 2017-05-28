@@ -34,5 +34,6 @@ namespace SiedlerVonSaffar.NetworkMessageProtocol
         SERVER_NEED_PLAYER_NAME = 0x00F05000,
         SERVER_SET_BANDIT = 0x00F06000,
         SERVER_ERROR = 0x00F07000,
+        SERVER_PLAYER_WIN = 0x00F08000
     }
 }

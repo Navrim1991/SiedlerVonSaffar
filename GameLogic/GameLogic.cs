@@ -125,6 +125,7 @@ namespace SiedlerVonSaffar.GameLogic
 
         public void Signal()
         {
+            Thread.Sleep(20);
             waitHandle.Set();
         }
 
@@ -345,9 +346,6 @@ namespace SiedlerVonSaffar.GameLogic
 
                     SerializePlayerData(element);
                 }
-
-                SerializePlayerData(currentPlayer);
-
             }
             else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.CarbonFibres)
             {
@@ -358,8 +356,6 @@ namespace SiedlerVonSaffar.GameLogic
 
                     SerializePlayerData(element);
                 }
-
-                SerializePlayerData(currentPlayer);
             }
             else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.Deuterium)
             {
@@ -370,8 +366,6 @@ namespace SiedlerVonSaffar.GameLogic
 
                     SerializePlayerData(element);
                 }
-
-                SerializePlayerData(currentPlayer);
             }
             else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.FriendlyAlien)
             {
@@ -394,8 +388,6 @@ namespace SiedlerVonSaffar.GameLogic
 
                     SerializePlayerData(element);
                 }
-
-                SerializePlayerData(currentPlayer);
             }
         }
 
@@ -405,37 +397,26 @@ namespace SiedlerVonSaffar.GameLogic
             {
                 currentPlayer.ResourceCardsBiomass += 2;
                 ResourceCardsBiomass -= 2;
-
-                SerializePlayerData(currentPlayer);
-
             }
             else if (invention.ResourceCard is GameObjects.Menu.Cards.Resources.CarbonFibres)
             {
                 currentPlayer.ResourceCardsCarbonFibres += 2;
                 ResourceCardsCarbonFibres -= 2;
-
-                SerializePlayerData(currentPlayer);
             }
             else if (invention.ResourceCard is GameObjects.Menu.Cards.Resources.Deuterium)
             {
                 currentPlayer.ResourceCardsDeuterium += 2;
                 ResourceCardsDeuterium -= 2;
-
-                SerializePlayerData(currentPlayer);
             }
             else if (invention.ResourceCard is GameObjects.Menu.Cards.Resources.FriendlyAlien)
             {
                 currentPlayer.ResourceCardsFriendlyAlien += 2;
                 ResourceCardsFriendlyAlien -= 2;
-
-                SerializePlayerData(currentPlayer);
             }
             else if (invention.ResourceCard is GameObjects.Menu.Cards.Resources.Titan)
             {
                 currentPlayer.ResourceCardsTitan += 2;
                 ResourceCardsTitan -= 2;
-
-                SerializePlayerData(currentPlayer);
             }
         }
 
@@ -473,8 +454,6 @@ namespace SiedlerVonSaffar.GameLogic
 
                 currentPlayer.VictoryCards.Add(new GameObjects.Menu.Cards.Victory.SpaceMarine());
 
-                SerializePlayerData(currentPlayer);
-
             }
 
             TxQueue.Enqueue(new TransmitMessage(currentPlayer.ClientIP, tcpProtocol.SERVER_SET_BANDIT, TransmitMessage.TransmitTyps.TO_OWN));
@@ -506,6 +485,8 @@ namespace SiedlerVonSaffar.GameLogic
             {
                 HandleProgresscardSpaceMarine();
             }
+
+            SerializePlayerData(currentPlayer);
         }
 
         private void HandleDeal(byte[] dealData)
@@ -1010,7 +991,7 @@ namespace SiedlerVonSaffar.GameLogic
 
         private bool CanSetStructCity()
         {
-            if (currentPlayer.ResourceCardsTitan >= 3 && currentPlayer.ResourceCardsBiomass > 2)
+            if (currentPlayer.ResourceCardsTitan >= 3 && currentPlayer.ResourceCardsBiomass >= 2)
                 return true;
 
             return false;

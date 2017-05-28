@@ -587,7 +587,7 @@ namespace SiedlerVonSaffar.Prototyp
                             currentPlayer.Outposts++;
 
                             currentPlayer.ResourceCardsTitan -= 3;
-                            currentPlayer.ResourceCardsBiomass -= 3;
+                            currentPlayer.ResourceCardsBiomass -= 2;
 
                             choosedAngle.BuildTyp = DataStruct.BuildTypes.CITY;
                             choosedAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
@@ -745,15 +745,7 @@ namespace SiedlerVonSaffar.Prototyp
 
                                         DataStruct.Angle choosedAngle = globalContainer.Angles[positionY, positionX];
 
-                                        if (choosedAngle.BuildStruct == DataStruct.BuildStructTypes.CAN_SET_BUILDING_CITY)
-                                        {
-                                            currentPlayer.Cities--;
-                                            currentPlayer.Outposts++;
-                                            choosedAngle.BuildTyp = DataStruct.BuildTypes.CITY;
-                                            choosedAngle.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
-                                            choosedAngle.Building = new GameObjects.Buildings.City(currentPlayer.PlayerID);
-                                        }
-                                        else if (choosedAngle.BuildStruct == DataStruct.BuildStructTypes.CAN_SET_BUILDING_OUTPOST)
+                                        if (choosedAngle.BuildStruct == DataStruct.BuildStructTypes.CAN_SET_BUILDING_OUTPOST)
                                         {
                                             currentPlayer.Outposts--;
                                             choosedAngle.BuildTyp = DataStruct.BuildTypes.OUTPOST;
@@ -848,7 +840,18 @@ namespace SiedlerVonSaffar.Prototyp
                             else if (tcpProtocol.SERVER_CONTAINER_DATA_OWN.SequenceEqual(equalBytes))
                             {
                                 if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OWN)
+                                {
+                                    if(currentStage == GameObjects.GameStage.GameStages.PLAYER_STAGE_ROLL_DICE)
+                                    {
+                                        currentPlayer = (from p in players where p.ClientIP.ToString() == message.IPToSend.ToString() select p).First();
+
+                                        gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, HandleRollDice(random.Next(1, 12), tcpProtocol.PLAYER_ROLL_DICE)));
+
+                                        gameLogic.Signal();
+                                    }
+
                                     globalContainer = HandleContainerDataOwn(message.Data);
+                                }                                    
                             }                                
                             else if (tcpProtocol.SERVER_ERROR.SequenceEqual(equalBytes))
                             {
@@ -865,102 +868,87 @@ namespace SiedlerVonSaffar.Prototyp
                                     Console.WriteLine(errorMessage);
                                 }
                             }
+                            else if (tcpProtocol.SERVER_SET_BANDIT.SequenceEqual(equalBytes))
+                            {
+                                if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OWN)
+                                {
+                                    Console.WriteLine("Wähle ein Feld aus, auf dem du den Räuber setzen möchtest(y,x) " + currentPlayer.Name);
 
+                                    for (int i = 0; i < globalContainer.Hexagons.GetLength(0); i++)
+                                    {
+                                        for (int j = 0; j < globalContainer.Hexagons.GetLength(1); j++)
+                                        {
+                                            if (globalContainer.Hexagons[i, j] == null)
+                                                continue;
+
+                                            globalContainer.Hexagons[i, j].HasBandit = false;
+
+                                            Console.WriteLine("Feld " + i + ", " + j);
+                                        }
+                                    }
+
+                                    int positionY = Convert.ToInt32(Console.ReadLine());
+                                    int positionX = Convert.ToInt32(Console.ReadLine());
+
+                                    globalContainer.Hexagons[positionY, positionX].HasBandit = true;
+
+                                    byte[] data = HandleContainerData(globalContainer);
+
+                                    tcpProtocol.PLAYER_SET_BANDIT.CopyTo(data, 0);
+
+                                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, data));
+
+                                    gameLogic.Signal();
+
+                                    continue;
+                                }
+                            }
+
+                            if (gameLogic.TxQueue.Count > 0)
+                                continue;
+
+                            if (playerPlayedProgressCardSteet)
+                            {
+                                if (buildHyperloop(ref currentPlayer) > 0)
+                                {
+                                    Console.WriteLine(currentPlayer.Name + " bitte eine Position für deine Hyperloop wählen (y,x)");
+                                    int positionY = Convert.ToInt32(Console.ReadLine());
+                                    int positionX = Convert.ToInt32(Console.ReadLine());
+
+                                    DataStruct.Edge choosedEdge = (DataStruct.Edge)globalContainer.Data[positionY, positionX];
+
+                                    if (choosedEdge.BuildStruct == DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP)
+                                    {
+                                        choosedEdge.BuildTyp = DataStruct.BuildTypes.HYPERLOOP;
+                                        choosedEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
+                                        choosedEdge.Building = new GameObjects.Buildings.Hyperloop(currentPlayer.PlayerID);
+                                    }
+
+                                    byte[] data = HandleContainerData(globalContainer);
+
+                                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, data));
+
+                                    gameLogic.Signal();
+
+                                    playerPlayedProgressCardSteetCounter++;
+
+                                    if (playerPlayedProgressCardSteetCounter == 2)
+                                    {
+                                        playerPlayedProgressCardSteetCounter = 0;
+                                        playerPlayedProgressCardSteet = false;
+                                    }
+
+                                    continue;
+
+                                }
+                            }
 
                             switch (currentStage)
                             {
+                                case GameObjects.GameStage.GameStages.PLAYER_STAGE_DEAL:                                   
 
-
-                                case GameObjects.GameStage.GameStages.PLAYER_STAGE_ROLL_DICE:
-                                    if (tcpProtocol.SERVER_CONTAINER_DATA_OWN.SequenceEqual(equalBytes))
-                                    {
-                                        if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OWN)
-                                        {
-                                            currentPlayer = (from p in players where p.ClientIP.ToString() == message.IPToSend.ToString() select p).First();
-
-                                            gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, HandleRollDice(random.Next(1,12), tcpProtocol.PLAYER_ROLL_DICE)));
-
-                                            gameLogic.Signal();                                           
-                                                
-                                        }
-                                            
-                                    }
-                                    break;
-                                case GameObjects.GameStage.GameStages.PLAYER_STAGE_DEAL:
-
-                                   
-                                    
-                                    if(playerPlayedProgressCardSteet)
-                                    {
-                                        if (buildHyperloop(ref currentPlayer) > 0)
-                                        {
-                                            Console.WriteLine(currentPlayer.Name + " bitte eine Position für deine Hyperloop wählen (y,x)");
-                                            int positionY = Convert.ToInt32(Console.ReadLine());
-                                            int positionX = Convert.ToInt32(Console.ReadLine());
-
-                                            DataStruct.Edge choosedEdge = (DataStruct.Edge)globalContainer.Data[positionY, positionX];
-
-                                            if (choosedEdge.BuildStruct == DataStruct.BuildStructTypes.CAN_SET_BUILDING_HYPERLOOP)
-                                            {
-                                                choosedEdge.BuildTyp = DataStruct.BuildTypes.HYPERLOOP;
-                                                choosedEdge.BuildStruct = DataStruct.BuildStructTypes.CANT_SET_BUILDING;
-                                                choosedEdge.Building = new GameObjects.Buildings.Hyperloop(currentPlayer.PlayerID);
-                                            }
-
-                                            byte[] data = HandleContainerData(globalContainer);
-
-                                            gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, data));
-
-                                            gameLogic.Signal();
-
-                                            playerPlayedProgressCardSteetCounter++;
-
-                                            if(playerPlayedProgressCardSteetCounter == 2)
-                                            {
-                                                playerPlayedProgressCardSteetCounter = 0;
-                                                playerPlayedProgressCardSteet = false;
-                                            }
-
-                                            continue;
-
-                                        }
-                                    }
-
-                                    if (tcpProtocol.SERVER_SET_BANDIT.SequenceEqual(equalBytes))
-                                    {
-                                        if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OWN)
-                                        {
-                                            Console.WriteLine("Wähle ein Feld aus, auf dem du den Räuber setzen möchtest(y,x) " + currentPlayer.Name);
-                                            
-                                            for(int i = 0; i < globalContainer.Hexagons.GetLength(0); i++)
-                                            {
-                                                for (int j = 0; j < globalContainer.Hexagons.GetLength(1); j++)
-                                                {
-                                                    if (globalContainer.Hexagons[i, j] == null)
-                                                        continue;
-
-                                                    globalContainer.Hexagons[i, j].HasBandit = false;
-
-                                                    Console.WriteLine("Feld " + i + ", " + j);                                                    
-                                                }
-                                            }
-
-                                            int positionY = Convert.ToInt32(Console.ReadLine());
-                                            int positionX = Convert.ToInt32(Console.ReadLine());
-
-                                            globalContainer.Hexagons[positionY, positionX].HasBandit = true;
-
-                                            byte[] data = HandleContainerData(globalContainer);
-
-                                            tcpProtocol.PLAYER_SET_BANDIT.CopyTo(data, 0);
-
-                                            gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, data));
-
-                                            gameLogic.Signal();
-
-                                            continue;
-                                        }
-                                    }
+                                    if (gameLogic.TxQueue.Count > 0)
+                                        continue;
 
                                     Console.WriteLine("Was wollen sie tun " + currentPlayer.Name);
                                     Console.WriteLine("(1) handeln");
@@ -968,6 +956,8 @@ namespace SiedlerVonSaffar.Prototyp
                                     Console.WriteLine("(3) Entwicklungskarte spielen");
                                     Console.WriteLine("(4) Entwicklungskarte kaufen, 1 Titan, 1 Fruendliches Alien, 1 Biomasse");
                                     Console.WriteLine("(5) Fertig");
+
+
 
                                     value = Convert.ToInt32(Console.ReadLine());
 
@@ -1003,46 +993,15 @@ namespace SiedlerVonSaffar.Prototyp
                                     break;
                                 case GameObjects.GameStage.GameStages.PLAYER_STAGE_BUILD:
 
-                                    if (tcpProtocol.SERVER_SET_BANDIT.SequenceEqual(equalBytes))
-                                    {
-                                        if (message.TransmitTyp == GameLogic.TransmitMessage.TransmitTyps.TO_OWN)
-                                        {
-                                            Console.WriteLine("Wähle ein Feld aus, auf dem du den Räuber setzen möchtest(y,x) " + currentPlayer.Name);
-
-                                            for (int i = 0; i < globalContainer.Hexagons.GetLength(0); i++)
-                                            {
-                                                for (int j = 0; j < globalContainer.Hexagons.GetLength(1); j++)
-                                                {
-                                                    if (globalContainer.Hexagons[i, j] == null)
-                                                        continue;
-
-                                                    globalContainer.Hexagons[i, j].HasBandit = false;
-
-                                                    Console.WriteLine("Feld " + i + ", " + j);
-                                                }
-                                            }
-
-                                            int positionY = Convert.ToInt32(Console.ReadLine());
-                                            int positionX = Convert.ToInt32(Console.ReadLine());
-
-                                            globalContainer.Hexagons[positionY, positionX].HasBandit = true;
-
-                                            byte[] data = HandleContainerData(globalContainer);
-
-                                            tcpProtocol.PLAYER_SET_BANDIT.CopyTo(data, 0);
-
-                                            gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, data));
-
-                                            gameLogic.Signal();
-
-                                            continue;
-                                        }
-                                    }
+                                    if (gameLogic.TxQueue.Count > 0)
+                                        continue;
 
                                     Console.WriteLine("(1) bauen");
                                     Console.WriteLine("(2) Entwicklungskarte spielen");
                                     Console.WriteLine("(3) Entwicklungskarte kaufen , 1 Titan, 1 Fruendliches Alien, 1 Biomasse");
                                     Console.WriteLine("(4) Fertig");
+
+
 
                                     value = Convert.ToInt32(Console.ReadLine());
 
