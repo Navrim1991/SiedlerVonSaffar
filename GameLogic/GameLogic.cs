@@ -19,9 +19,10 @@ namespace SiedlerVonSaffar.GameLogic
 {
     public class GameLogic
     {
+        [NonSerialized]
         internal Queue<GameObjects.Player.Player> Players;
 
-        private StateMachine.State CurrentState { get; set; }
+        private StateMachine.State CurrentState;
 
         internal GameObjects.Player.Player CurrentPlayer
         {
@@ -31,25 +32,21 @@ namespace SiedlerVonSaffar.GameLogic
         internal DataStruct.Container containerData;
         internal ThreadStart gameLogicThreadStart;
         internal Thread gameLogicThread;
-        internal TcpIpProtocol tcpProtocol;
         //internal GameStage.GameStages gameStage;
         internal bool playerPlayedProgressCardSteet;
         internal int roundCounter;
         internal int foundationStageRoundCounter = 0;
-
         internal readonly short COUNT_RESOURCE_CARDS = 24;
+        internal int ResourceCardsBiomass;
+        internal int ResourceCardsCarbonFibres;
+        internal int ResourceCardsDeuterium;
+        internal int ResourceCardsFriendlyAlien;
+        internal int ResourceCardsTitan;
 
-        internal int ResourceCardsBiomass { get; set; }
-        internal int ResourceCardsCarbonFibres { get; set; }
-        internal int ResourceCardsDeuterium { get; set; }
-        internal int ResourceCardsFriendlyAlien { get; set; }
-        internal int ResourceCardsTitan { get; set; }
+        internal List<GameObjects.Menu.Cards.Progress.ProgressCard> ProgressCards;
 
-
-        internal List<GameObjects.Menu.Cards.Progress.ProgressCard> ProgressCards { get; set; }
-
-        public short PlayersReady { get; set; }
-        public bool GameHasStarted { get; set; }
+        public short PlayersReady;
+        public bool GameHasStarted;
 
         public ConcurrentQueue<object> RxQueue { get; private set; }
         public ConcurrentQueue<object> TxQueue { get; private set; }
@@ -68,7 +65,6 @@ namespace SiedlerVonSaffar.GameLogic
             gameLogicThreadStart = new ThreadStart(Start);
             gameLogicThread = new Thread(gameLogicThreadStart);
             gameLogicThread.Name = "GameLogic";
-            tcpProtocol = new TcpIpProtocol();
             ProgressCards = new List<GameObjects.Menu.Cards.Progress.ProgressCard>();
 
             int i;
@@ -148,7 +144,7 @@ namespace SiedlerVonSaffar.GameLogic
         }
 
         #region Threading
-
+        [NonSerialized]
         private EventWaitHandle waitHandle = new EventWaitHandle(false, EventResetMode.ManualReset);
 
         public void Signal()
@@ -372,6 +368,7 @@ namespace SiedlerVonSaffar.GameLogic
                     CurrentPlayer.ResourceCardsBiomass += element.ResourceCardsBiomass;
                     element.ResourceCardsBiomass = 0;
 
+
                     SerializePlayerData(element);
                 }
             }
@@ -404,8 +401,6 @@ namespace SiedlerVonSaffar.GameLogic
 
                     SerializePlayerData(element);
                 }
-
-                SerializePlayerData(CurrentPlayer);
             }
             else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.Titan)
             {
@@ -484,7 +479,7 @@ namespace SiedlerVonSaffar.GameLogic
 
             }
 
-            TxQueue.Enqueue(new TransmitMessage(CurrentPlayer.ClientIP, tcpProtocol.SERVER_SET_BANDIT, TransmitMessage.TransmitTyps.TO_OWN));
+            TxQueue.Enqueue(new TransmitMessage(CurrentPlayer.ClientIP, new TcpIpProtocol().SERVER_SET_BANDIT, TransmitMessage.TransmitTyps.TO_OWN));
         }
 
         internal void HandleProgressCards(byte[] data)
@@ -818,7 +813,17 @@ namespace SiedlerVonSaffar.GameLogic
 
             IFormatter formatter = new BinaryFormatter();
 
-            formatter.Serialize(stream, serializeableObject);
+            try
+            {
+                formatter.Serialize(stream, serializeableObject);
+            }
+            catch (Exception ex)
+            {
+                string a = ex.Message;
+                throw;
+            }
+
+            
 
             byte[] data = new byte[stream.Length + protocol.Length + 1];
 
@@ -844,11 +849,11 @@ namespace SiedlerVonSaffar.GameLogic
 
         internal void SerializeContainerData()
         {
-            byte[] data = this.Serialize(tcpProtocol.SERVER_CONTAINER_DATA_OWN, containerData);
+            byte[] data = this.Serialize(new TcpIpProtocol().SERVER_CONTAINER_DATA_OWN, this.containerData);
 
             TxQueue.Enqueue(new TransmitMessage(CurrentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
 
-            data = this.Serialize(tcpProtocol.SERVER_CONTAINER_DATA_OTHER, containerData);
+            data = this.Serialize(new TcpIpProtocol().SERVER_CONTAINER_DATA_OTHER, containerData);
 
             if (!Configuration.DeveloperParameter.IsPrototyp)
                 TxQueue.Enqueue(new TransmitMessage(CurrentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
@@ -856,7 +861,7 @@ namespace SiedlerVonSaffar.GameLogic
 
         internal void SerializePlayerData(GameObjects.Player.Player player)
         {
-            byte[] data = this.Serialize(tcpProtocol.SERVER_PLAYER_DATA, player);
+            byte[] data = this.Serialize(new TcpIpProtocol().SERVER_PLAYER_DATA, player);
 
             TxQueue.Enqueue(new TransmitMessage(player.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
 
@@ -967,7 +972,8 @@ namespace SiedlerVonSaffar.GameLogic
                     && CurrentState is StateMachine.FoundationStageRoundTwo)
                     return;
 
-                SerializeContainerData();               
+                //containerData.Notify();
+                SerializeContainerData();
 
             }
             else
@@ -976,12 +982,14 @@ namespace SiedlerVonSaffar.GameLogic
 
                 foundationStageRoundCounter++;
 
-                SerializeContainerData();                
+                //containerData.Notify();
+                SerializeContainerData();
             }
         }
 
         internal void SetupNewPlayer(GameObjects.Player.Player newPlayer)
-        {
+        { 
+
             newPlayer.Cities = 4;
 
             newPlayer.Outposts = 5;
@@ -990,7 +998,7 @@ namespace SiedlerVonSaffar.GameLogic
 
             Players.Enqueue(newPlayer);
 
-            byte[] data = Serialize(tcpProtocol.SERVER_PLAYER_DATA, newPlayer);
+            byte[] data = Serialize(new TcpIpProtocol().SERVER_PLAYER_DATA, newPlayer);
 
             TxQueue.Enqueue(new TransmitMessage(newPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
         }
@@ -1330,7 +1338,7 @@ namespace SiedlerVonSaffar.GameLogic
 
 
         private void Start()
-        {          
+        {
             object rxObject; 
             while (true)
             {
@@ -1851,11 +1859,11 @@ namespace SiedlerVonSaffar.GameLogic
                     {
                         RecieveMessage message = (RecieveMessage)rxObject;
 
-                        if (tcpProtocol.IsClientDataPattern(message.Data))
+                        if (new TcpIpProtocol().IsClientDataPattern(message.Data))
                         {
                             byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
 
-                            if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
+                            if (new TcpIpProtocol().PLAYER_READY.SequenceEqual(equalBytes))
                             {
                                 if (GameHasStarted == false)
                                 {
@@ -1865,7 +1873,7 @@ namespace SiedlerVonSaffar.GameLogic
                                     {
                                         GameHasStarted = true;
 
-                                        TxQueue.Enqueue(new TransmitMessage(tcpProtocol.SERVER_NEED_PLAYER_NAME));
+                                        TxQueue.Enqueue(new TransmitMessage(new TcpIpProtocol().SERVER_NEED_PLAYER_NAME));
                                         SetState(new StateMachine.FoundationStage(this));
                                     }
                                 }
@@ -1883,8 +1891,5 @@ namespace SiedlerVonSaffar.GameLogic
 
             return false;
         }
-
-
-
     }
 }

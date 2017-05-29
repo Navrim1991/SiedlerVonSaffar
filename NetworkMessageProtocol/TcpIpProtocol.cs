@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace SiedlerVonSaffar.NetworkMessageProtocol
 {
+    [Serializable]
     public class TcpIpProtocol
     {
         private const int TCP_IP_PROTOCOL_CLIENT_PATTERN = 0x00000F00;

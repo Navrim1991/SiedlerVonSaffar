@@ -904,9 +904,6 @@ namespace SiedlerVonSaffar.Prototyp
                                 }
                             }
 
-                            if (gameLogic.TxQueue.Count > 0)
-                                continue;
-
                             if (playerPlayedProgressCardSteet)
                             {
                                 if (buildHyperloop(ref currentPlayer) > 0)
@@ -946,9 +943,6 @@ namespace SiedlerVonSaffar.Prototyp
                             switch (currentStage)
                             {
                                 case GameObjects.GameStage.GameStages.PLAYER_STAGE_DEAL:                                   
-
-                                    if (gameLogic.TxQueue.Count > 0)
-                                        continue;
 
                                     Console.WriteLine("Was wollen sie tun " + currentPlayer.Name);
                                     Console.WriteLine("(1) handeln");
@@ -992,9 +986,6 @@ namespace SiedlerVonSaffar.Prototyp
 
                                     break;
                                 case GameObjects.GameStage.GameStages.PLAYER_STAGE_BUILD:
-
-                                    if (gameLogic.TxQueue.Count > 0)
-                                        continue;
 
                                     Console.WriteLine("(1) bauen");
                                     Console.WriteLine("(2) Entwicklungskarte spielen");

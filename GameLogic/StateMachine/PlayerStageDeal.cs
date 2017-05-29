@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace SiedlerVonSaffar.GameLogic.StateMachine
 {
+    [Serializable]
     class PlayerStageDeal : State
     {
 

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace SiedlerVonSaffar.NetworkMessageProtocol
 {
+    [Serializable]
     public class BroadcastProtocol
     {
         private const int BROADCAST_PROTOCOL_FIND_SERVER_PATTERN = 0x000000F0;

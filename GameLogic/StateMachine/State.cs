@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace SiedlerVonSaffar.GameLogic.StateMachine
 {
+    [Serializable]
     abstract class State
     {
         protected GameLogic gameLogic;

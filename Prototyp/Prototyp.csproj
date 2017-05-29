@@ -40,7 +40,7 @@
       <HintPath>..\SiedlerVonSaffarServer\bin\Debug\SiedlerVonSaffar.Configuration.dll</HintPath>
     </Reference>
     <Reference Include="SiedlerVonSaffar.DataStruct">
-      <HintPath>E:\Dropbox\Dropbox\SWTGruppe\SiedlerVonSaffarClient\GameStateManagementSample\GameStateManagementSample\bin\Windows\Debug\SiedlerVonSaffar.DataStruct.dll</HintPath>
+      <HintPath>E:\Dropbox\Dropbox\SWTGruppe\SiedlerVonSaffarClient\GameStateManagementSample\DataStruct\bin\Debug\SiedlerVonSaffar.DataStruct.dll</HintPath>
     </Reference>
     <Reference Include="SiedlerVonSaffar.GameLogic">
       <HintPath>..\SiedlerVonSaffarServer\bin\Debug\SiedlerVonSaffar.GameLogic.dll</HintPath>
