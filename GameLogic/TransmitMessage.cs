@@ -15,14 +15,12 @@ namespace SiedlerVonSaffar.GameLogic
             TO_OWN,
             TO_OTHER
         }
-        public IPEndPoint IPToSend { get; set; }
         public byte[] Data { get; set; }
 
         public TransmitTyps TransmitTyp { get; set; }
 
-        public TransmitMessage(IPEndPoint ipToSend, byte[] data, TransmitTyps transmitTyp)
+        public TransmitMessage(byte[] data, TransmitTyps transmitTyp)
         {
-            IPToSend = ipToSend;
             Data = data;
             TransmitTyp = transmitTyp;
         }

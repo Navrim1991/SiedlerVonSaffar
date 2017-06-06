@@ -288,7 +288,7 @@ namespace SiedlerVonSaffar.Prototyp
                     break;
                 case 6:
                     currentStage = GameObjects.GameStage.GameStages.PLAYER_STAGE_BUILD;
-                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, tcpProtocol.PLAYER_READY));
+                    gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(tcpProtocol.PLAYER_READY));
 
                     gameLogic.Signal();
                     return;
@@ -848,6 +848,8 @@ namespace SiedlerVonSaffar.Prototyp
                                         gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, HandleRollDice(random.Next(1, 12), tcpProtocol.PLAYER_ROLL_DICE)));
 
                                         gameLogic.Signal();
+
+                                        currentStage = GameObjects.GameStage.GameStages.PLAYER_STAGE_DEAL;
                                     }
 
                                     globalContainer = HandleContainerDataOwn(message.Data);
@@ -971,15 +973,12 @@ namespace SiedlerVonSaffar.Prototyp
 
                                             gameLogic.Signal();
 
-                                            Thread.Sleep(100);
                                             break;
                                         case 5:
                                             currentStage = GameObjects.GameStage.GameStages.PLAYER_STAGE_BUILD;
                                             gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, tcpProtocol.PLAYER_READY));
 
                                             gameLogic.Signal();
-
-                                            Thread.Sleep(100);
 
                                             break;
                                     }
@@ -1008,16 +1007,12 @@ namespace SiedlerVonSaffar.Prototyp
                                             gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, tcpProtocol.PLAYER_BUY_PROGRESS_CARD));
 
                                             gameLogic.Signal();
-
-                                            Thread.Sleep(100);
                                             break;
                                         case 4:
                                             currentStage = GameObjects.GameStage.GameStages.PLAYER_STAGE_ROLL_DICE;
                                             gameLogic.RxQueue.Enqueue(new GameLogic.RecieveMessage(currentPlayer.ClientIP, tcpProtocol.PLAYER_READY));
 
                                             gameLogic.Signal();
-
-                                            Thread.Sleep(100);
 
                                             break;
                                     }                                    

@@ -14,19 +14,18 @@ namespace SiedlerVonSaffar.Networking.TCP
 {
     class TcpServer : NetworkMessageProtocol.Tcp
     {
-        private byte connectionCount = 0;
-        private readonly object aSyncLock = null;
+        //private readonly object aSyncLock = null;
         private static TcpServer singleton;
-        private ARP.ArpRequest arpRequest;
+        List<Socket> connections;
+        //private ARP.ArpRequest arpRequest;
         public bool StopListening { get; set; }
-        private GameLogic.GameLogic gameLogic;
 
+        private RabbitMQBroker.Server rabbitMQServer;
         private TcpServer()
         {
             StopListening = false;
-
-            gameLogic = new GameLogic.GameLogic();
-
+            rabbitMQServer = new RabbitMQBroker.Server();
+            connections = new List<Socket>();
         }
 
         public static TcpServer Instance
@@ -45,10 +44,9 @@ namespace SiedlerVonSaffar.Networking.TCP
 
         public void StartListening()
         {
-            gameLogic.RxQueue.Enqueue(this);
-
             Socket listener = new Socket(AddressFamily.InterNetwork,
                 SocketType.Stream, ProtocolType.Tcp);
+
 
             try
             {
@@ -57,26 +55,19 @@ namespace SiedlerVonSaffar.Networking.TCP
 
                 Configuration.DeveloperParameter.PrintDebug("TCP server started\n\r\tWaiting for TCP Connections");
 
-                bool gameHasStarted = false;
-
-                while (connectionCount < ServerConfig.MAX_CONNECTIONS && !gameHasStarted)
+                while (rabbitMQServer.TcpConnectionCount < ServerConfig.MAX_CONNECTIONS && !rabbitMQServer.GameLogic.GameHasStarted)
                 {
-                    if (gameLogic.GameHasStarted)
-                        break;
+                    connections.Add(listener.Accept());
 
-                    Socket acceptedConnection = listener.Accept();
-
-                    NetworkMessageProtocol.SocketStateObject state = new NetworkMessageProtocol.SocketStateObject();
-                    state.WorkSocket = acceptedConnection;                    
-
-                    acceptedConnection.BeginReceive(state.buffer, 0, NetworkMessageProtocol.SocketStateObject.BufferSize, 0,
-                        ReceiveCallback, state);
-                           
-                    connectionCount++;
+                    rabbitMQServer.TcpConnectionCount++;
                 }
 
-                gameLogic.GameHasStarted = true;
-                gameLogic.PlayersReady = connectionCount;
+                foreach(Socket element in connections)
+                {
+                    element.Disconnect(false);
+                }
+
+                connections = null;
 
                 Broadcast.BroadcastServer.Instance.Dispose();
             }
@@ -84,62 +75,6 @@ namespace SiedlerVonSaffar.Networking.TCP
             {
                 Configuration.DeveloperParameter.PrintDebug(ex.Message + "\n\r" + ex.StackTrace);
             }
-
-            object txObject;
-
-            while (true)
-            {
-                while (gameLogic.TxQueue.Count < 1) ;
-
-                gameLogic.TxQueue.TryDequeue(out txObject);
-
-                if (txObject is NetworkMessageProtocol.SocketStateObject)
-                {
-                    NetworkMessageProtocol.SocketStateObject state = (NetworkMessageProtocol.SocketStateObject)txObject;
-                    Send(state.WorkSocket, state.buffer);
-                }
-           }
         }
-
-        private void ReceiveCallback(IAsyncResult asyncResult)
-        {
-            NetworkMessageProtocol.SocketStateObject state = (NetworkMessageProtocol.SocketStateObject)asyncResult.AsyncState;
-            int bytesRead = state.WorkSocket.EndReceive(asyncResult);
-
-            if (bytesRead > 0)
-            {
-                gameLogic.RxQueue.Enqueue(state);
-            }                
-
-            state.WorkSocket.BeginReceive(state.buffer, 0, NetworkMessageProtocol.SocketStateObject.BufferSize, 0,
-                        ReceiveCallback, state);
-        }
-
-        private void Send(Socket handler, byte[] data)
-        {
-            // Convert the string data to byte data using ASCII encoding.
-
-            // Begin sending the data to the remote device.
-            handler.BeginSend(data, 0, data.Length, 0,
-                SendCallback, handler);
-        }
-
-        private void SendCallback(IAsyncResult asyncResult)
-        {
-            try
-            {
-                // Retrieve the socket from the state object.
-                Socket handler = (Socket)asyncResult.AsyncState;
-
-                // Complete sending the data to the remote device.
-                int bytesSent = handler.EndSend(asyncResult);
-                Console.WriteLine("Sent {0} bytes to client.", bytesSent);
-            }
-            catch (Exception ex)
-            {
-                Configuration.DeveloperParameter.PrintDebug(ex.Message + "\n\r" + ex.StackTrace);
-            }
-        }
-
     }
 }

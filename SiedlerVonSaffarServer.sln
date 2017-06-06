@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameLogic", "GameLogic\Game
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Prototyp", "Prototyp\Prototyp.csproj", "{87960741-A3F6-47DD-9317-FDD59D50977D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RabbitMQBroker", "RabbitMQBroker\RabbitMQBroker.csproj", "{5730F969-8735-4CEF-8321-349ED810C130}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{87960741-A3F6-47DD-9317-FDD59D50977D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{87960741-A3F6-47DD-9317-FDD59D50977D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{87960741-A3F6-47DD-9317-FDD59D50977D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5730F969-8735-4CEF-8321-349ED810C130}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5730F969-8735-4CEF-8321-349ED810C130}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5730F969-8735-4CEF-8321-349ED810C130}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5730F969-8735-4CEF-8321-349ED810C130}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

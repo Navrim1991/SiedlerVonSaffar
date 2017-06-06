@@ -44,8 +44,11 @@
   <ItemGroup>
     <Compile Include="Broadcast.cs" />
     <Compile Include="BroadcastProtocol.cs" />
+    <Compile Include="NetworkMessageServer.cs" />
+    <Compile Include="NetworkMessageClient.cs" />
     <Compile Include="ProtocolTypes.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RabbitMQConfig.cs" />
     <Compile Include="SocketStateObject.cs" />
     <Compile Include="TcpIp.cs" />
     <Compile Include="TcpIpProtocol.cs" />

@@ -19,12 +19,12 @@ namespace SiedlerVonSaffar.GameLogic.StateMachine
             tcpProtocol = new TcpIpProtocol();
         }
 
-        public abstract void GetName(RecieveMessage message);
-        public abstract void DiceRolled(RecieveMessage message);
-        public abstract void FoundationRoundAllSet(RecieveMessage message);
-        public abstract void FoundationRoundOne(RecieveMessage message);
-        public abstract void BuildingsSet(RecieveMessage message);
+        public abstract void GetName(NetworkMessageClient message);
+        public abstract void DiceRolled(NetworkMessageClient message);
+        public abstract void FoundationRoundAllSet(NetworkMessageClient message);
+        public abstract void FoundationRoundOne(NetworkMessageClient message);
+        public abstract void BuildingsSet(NetworkMessageClient message);
 
-        public abstract void Dealed(RecieveMessage message);
+        public abstract void Dealed(NetworkMessageClient message);
     }
 }

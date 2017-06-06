@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SiedlerVonSaffar.NetworkMessageProtocol;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,16 +15,13 @@ namespace SiedlerVonSaffar.GameLogic.StateMachine
         {
 
         }
-        public override void BuildingsSet(RecieveMessage message)
+        public override void BuildingsSet(NetworkMessageClient message)
         {
-            if (tcpProtocol.IsClientDataPattern(message.Data))
+            if (message.ProtocolType == TcpIpProtocolType.PLAYER_CONTAINER_DATA)
             {
-
-                byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
-
-                if (tcpProtocol.PLAYER_CONTAINER_DATA.SequenceEqual(equalBytes))
+                if (message.Data.Length == 1 && message.Data[0] is DataStruct.Container)
                 {
-                    gameLogic.DeserializeContainerData(message.Data);
+                    gameLogic.SetNewContainerData((DataStruct.Container)message.Data[0]);
 
                     if (gameLogic.playerPlayedProgressCardSteet)
                     {
@@ -31,7 +29,7 @@ namespace SiedlerVonSaffar.GameLogic.StateMachine
 
                         gameLogic.playerPlayedProgressCardSteet = false;
 
-                        gameLogic.SerializeContainerData();
+                        gameLogic.SendContainerData();
                     }
                     else
                     {
@@ -46,57 +44,64 @@ namespace SiedlerVonSaffar.GameLogic.StateMachine
                         {
                             gameLogic.ComputeGameRules();
 
-                            gameLogic.SerializeContainerData();
+                            gameLogic.SendContainerData();
+
+                            gameLogic.SetState(new PlayerStageBuild(gameLogic));
                         }
                     }
-
                 }
-                else if (tcpProtocol.PLAYER_DATA.SequenceEqual(equalBytes))
+            }
+            else if (message.ProtocolType == TcpIpProtocolType.PLAYER_DEAL)
+            {
+                if (message.Data.Length == 1 && message.Data[0] is GameObjects.Player.Player)
                 {
-                    GameObjects.Player.Player tmp = gameLogic.HandelPlayerData(message.Data);
+                    GameObjects.Player.Player tmp = (GameObjects.Player.Player)message.Data[0];
 
-                    if (gameLogic.CurrentPlayer.PlayerID == tmp.PlayerID)
+                    if (gameLogic.CurrentPlayer.Name == tmp.Name)
+                    {
                         gameLogic.CurrentPlayer = tmp;
+                    }
                     else
                     {
-                        GameObjects.Player.Player tmp2 = (from p in gameLogic.Players where p.PlayerID == tmp.PlayerID select p).FirstOrDefault();
+                        GameObjects.Player.Player tmp2 = (from p in gameLogic.Players where p.Name == tmp.Name select p).FirstOrDefault();
 
                         if (tmp2 != null)
                             tmp2 = tmp;
                     }
                 }
-                else if (tcpProtocol.PLAYER_READY.SequenceEqual(equalBytes))
+            }
+            else if (message.ProtocolType == TcpIpProtocolType.PLAYER_READY)
+            {
+                gameLogic.nextPlayer();
+
+                gameLogic.ComputeGameRules();
+
+                gameLogic.SendContainerData();
+
+                gameLogic.SetState(new PlayerRollDice(gameLogic));
+            }
+            else if (message.ProtocolType == TcpIpProtocolType.PLAYER_BUY_PROGRESS_CARD)
+            {
+                if (gameLogic.PlayerCanBuyProgressCard() && gameLogic.ProgressCards.Count > 0)
                 {
-                    gameLogic.nextPlayer();
+                    gameLogic.CurrentPlayer.ProgressCards.Add(gameLogic.ProgressCards.Last());
 
-                    gameLogic.ComputeGameRules();
+                    gameLogic.CurrentPlayer.ProgressCards.Last().Round = gameLogic.roundCounter;
 
-                    gameLogic.SerializeContainerData();
+                    gameLogic.ProgressCards.Remove(gameLogic.ProgressCards.Last());
 
-                    gameLogic.SetState(new PlayerStageDeal(gameLogic));
+                    gameLogic.SendPlayerData(gameLogic.CurrentPlayer);
                 }
-                else if (tcpProtocol.PLAYER_BUY_PROGRESS_CARD.SequenceEqual(equalBytes))
+                else
                 {
-                    if (gameLogic.PlayerCanBuyProgressCard() && gameLogic.ProgressCards.Count > 0)
-                    {
-                        gameLogic.CurrentPlayer.ProgressCards.Add(gameLogic.ProgressCards.Last());
-
-                        gameLogic.CurrentPlayer.ProgressCards.Last().Round = gameLogic.roundCounter;
-
-                        gameLogic.ProgressCards.Remove(gameLogic.ProgressCards.Last());
-
-                        gameLogic.SerializePlayerData(gameLogic.CurrentPlayer);
-                    }
-                    else
-                    {
-                        byte[] error = gameLogic.Serialize(tcpProtocol.SERVER_ERROR, "Du hast zu weniger Ressourcen um eine Entwicklungskarte zu kaufen");
-
-                        gameLogic.TxQueue.Enqueue(new TransmitMessage(gameLogic.CurrentPlayer.ClientIP, error, TransmitMessage.TransmitTyps.TO_OWN));
-                    }
+                    gameLogic.TxQueue.Enqueue(new NetworkMessageServer(gameLogic.CurrentPlayer.Name, TcpIpProtocolType.SERVER_ERROR, new object[] { "Du hast zu weniger Ressourcen um eine Entwicklungskarte zu kaufen" }, MessageTyps.TO_OWN));
                 }
-                else if (tcpProtocol.PLAYER_PLAY_PROGRESS_CARD.SequenceEqual(equalBytes))
+            }
+            else if (message.ProtocolType == TcpIpProtocolType.PLAYER_PLAY_PROGRESS_CARD)
+            {
+                if (message.Data.Length == 1 && message.Data[0] is GameObjects.Menu.Cards.Progress.ProgressCard)
                 {
-                    gameLogic.HandleProgressCards(message.Data);
+                    gameLogic.HandleProgressCards((GameObjects.Menu.Cards.Progress.ProgressCard)message.Data[0]);
 
                     int points = gameLogic.CheckVictory(gameLogic.CurrentPlayer);
 
@@ -106,36 +111,30 @@ namespace SiedlerVonSaffar.GameLogic.StateMachine
                         //ANDERE PLAYER ZÄHLEN
                     }
                 }
-                else if (tcpProtocol.PLAYER_SET_BANDIT.SequenceEqual(equalBytes))
-                {
-                    gameLogic.DeserializeContainerData(message.Data);
-
-                    gameLogic.HandleBandit();
-                }
             }
         }
 
-        public override void Dealed(RecieveMessage message)
+        public override void Dealed(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }
 
-        public override void DiceRolled(RecieveMessage message)
+        public override void DiceRolled(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }
 
-        public override void FoundationRoundAllSet(RecieveMessage message)
+        public override void FoundationRoundAllSet(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }
 
-        public override void FoundationRoundOne(RecieveMessage message)
+        public override void FoundationRoundOne(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }
 
-        public override void GetName(RecieveMessage message)
+        public override void GetName(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }

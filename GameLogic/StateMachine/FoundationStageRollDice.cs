@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SiedlerVonSaffar.NetworkMessageProtocol;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,26 +19,23 @@ namespace SiedlerVonSaffar.GameLogic.StateMachine
 
         }
 
-        public override void BuildingsSet(RecieveMessage message)
+        public override void BuildingsSet(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }
 
-        public override void Dealed(RecieveMessage message)
+        public override void Dealed(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }
 
-        public override void DiceRolled(RecieveMessage message)
+        public override void DiceRolled(NetworkMessageClient message)
         {
-
-            if (tcpProtocol.IsClientDataPattern(message.Data))
+            if (message.ProtocolType == TcpIpProtocolType.PLAYER_STAGE_FOUNDATION_ROLL_DICE)
             {
-                byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
-
-                if (tcpProtocol.PLAYER_STAGE_FOUNDATION_ROLL_DICE.SequenceEqual(equalBytes))
+                if (message.Data.Length == 1 && message.Data[0] is int)
                 {
-                    int number = (int)gameLogic.Deserialize(message.Data);
+                    int number = (int)message.Data[0];
 
                     diceRolled++;
 
@@ -49,12 +47,13 @@ namespace SiedlerVonSaffar.GameLogic.StateMachine
                         {
                             GameObjects.Player.Player tmp = gameLogic.Players.Dequeue();
 
-                            if (tmp.ClientIP.Address.ToString() == message.ClientIP.Address.ToString())
+                            if(tmp.Name == message.PlayerName)
                             {
                                 if (gameLogic.CurrentPlayer != null)
                                     gameLogic.Players.Enqueue(gameLogic.CurrentPlayer);
 
                                 gameLogic.CurrentPlayer = tmp;
+
                                 break;
                             }
                             else
@@ -63,35 +62,35 @@ namespace SiedlerVonSaffar.GameLogic.StateMachine
                             }
                         }
                     }
-                }
 
-                if (diceRolled == gameLogic.PlayersReady)
-                {
-                    diceRolled = 0;
-                    diceNumber = 0;
+                    if (diceRolled == gameLogic.PlayersReady)
+                    {
+                        diceRolled = 0;
+                        diceNumber = 0;
 
-                    gameLogic.checkAngles();
+                        gameLogic.checkAngles();
 
-                    gameLogic.SerializeContainerData();
+                        gameLogic.SendContainerData();
 
-                    gameLogic.foundationStageRoundCounter++;
+                        gameLogic.foundationStageRoundCounter++;
 
-                    gameLogic.SetState(new FoundationStageRoundOne(gameLogic));
+                        gameLogic.SetState(new FoundationStageRoundOne(gameLogic));
+                    }
                 }
             }
         }
 
-        public override void FoundationRoundAllSet(RecieveMessage message)
+        public override void FoundationRoundAllSet(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }
 
-        public override void FoundationRoundOne(RecieveMessage message)
+        public override void FoundationRoundOne(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }
 
-        public override void GetName(RecieveMessage message)
+        public override void GetName(NetworkMessageClient message)
         {
             throw new NotImplementedException();
         }

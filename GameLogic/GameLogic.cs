@@ -101,27 +101,27 @@ namespace SiedlerVonSaffar.GameLogic
             CurrentState = nextState;
         }
 
-        public void GetName(RecieveMessage rxObject)
+        public void GetName(NetworkMessageClient rxObject)
         {
             CurrentState.GetName(rxObject);
         }
-        public void DiceRolled(RecieveMessage rxObject)
+        public void DiceRolled(NetworkMessageClient rxObject)
         {
             CurrentState.DiceRolled(rxObject);
         }
-        public void FoundationRoundAllSet(RecieveMessage rxObject)
+        public void FoundationRoundAllSet(NetworkMessageClient rxObject)
         {
             CurrentState.FoundationRoundAllSet(rxObject);
         }
-        public void FoundationRoundOne(RecieveMessage rxObject)
+        public void FoundationRoundOne(NetworkMessageClient rxObject)
         {
             CurrentState.FoundationRoundOne(rxObject);
         }
-        public void BuildingsSet(RecieveMessage rxObject)
+        public void BuildingsSet(NetworkMessageClient rxObject)
         {
             CurrentState.BuildingsSet(rxObject);
         }
-        public void Dealed(RecieveMessage rxObject)
+        public void Dealed(NetworkMessageClient rxObject)
         {
             CurrentState.Dealed(rxObject);
         }
@@ -164,6 +164,7 @@ namespace SiedlerVonSaffar.GameLogic
             double resourceCount = 0;
 
             foreach (GameObjects.Player.Player element in Players)
+
             {
                 resourceCount = 0;
                 resourceCount += element.ResourceCardsBiomass;
@@ -206,7 +207,7 @@ namespace SiedlerVonSaffar.GameLogic
                         }
                     }
 
-                    SerializePlayerData(element);
+                    SendPlayerData(element);
                 }
             }
 
@@ -251,7 +252,7 @@ namespace SiedlerVonSaffar.GameLogic
                     }
                 }
 
-                SerializePlayerData(CurrentPlayer);
+                SendPlayerData(CurrentPlayer);
             }
 
             DataStruct.Hexagon banditHexagon = null;
@@ -341,20 +342,22 @@ namespace SiedlerVonSaffar.GameLogic
 
                     if (!flag)
                     {
-                        SerializePlayerData(stealedPlayer);
-                        SerializePlayerData(CurrentPlayer);
+                        SendPlayerData(stealedPlayer);
+                        SendPlayerData(CurrentPlayer);
 
                         break;
                     }
                 }
             }
+
+            SetState(new StateMachine.PlayerStageDeal(this));
         }
 
         internal void HandleProgressCardHyperloop()
         {
             CheckEdges();
 
-            SerializeContainerData();
+            SendContainerData();
 
             playerPlayedProgressCardSteet = true;
         }
@@ -369,7 +372,7 @@ namespace SiedlerVonSaffar.GameLogic
                     element.ResourceCardsBiomass = 0;
 
 
-                    SerializePlayerData(element);
+                    SendPlayerData(element);
                 }
             }
             else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.CarbonFibres)
@@ -379,7 +382,7 @@ namespace SiedlerVonSaffar.GameLogic
                     CurrentPlayer.ResourceCardsCarbonFibres += element.ResourceCardsCarbonFibres;
                     element.ResourceCardsCarbonFibres = 0;
 
-                    SerializePlayerData(element);
+                    SendPlayerData(element);
                 }
             }
             else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.Deuterium)
@@ -389,7 +392,7 @@ namespace SiedlerVonSaffar.GameLogic
                     CurrentPlayer.ResourceCardsDeuterium += element.ResourceCardsDeuterium;
                     element.ResourceCardsDeuterium = 0;
 
-                    SerializePlayerData(element);
+                    SendPlayerData(element);
                 }
             }
             else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.FriendlyAlien)
@@ -399,7 +402,7 @@ namespace SiedlerVonSaffar.GameLogic
                     CurrentPlayer.ResourceCardsFriendlyAlien += element.ResourceCardsFriendlyAlien;
                     element.ResourceCardsFriendlyAlien = 0;
 
-                    SerializePlayerData(element);
+                    SendPlayerData(element);
                 }
             }
             else if (monopoly.ResourceCard is GameObjects.Menu.Cards.Resources.Titan)
@@ -409,7 +412,7 @@ namespace SiedlerVonSaffar.GameLogic
                     CurrentPlayer.ResourceCardsTitan += element.ResourceCardsTitan;
                     element.ResourceCardsTitan = 0;
 
-                    SerializePlayerData(element);
+                    SendPlayerData(element);
                 }
             }
         }
@@ -469,7 +472,7 @@ namespace SiedlerVonSaffar.GameLogic
                     {
                         element.VictoryCards.Remove(tmp);
 
-                        SerializePlayerData(element);
+                        SendPlayerData(element);
 
                         break;
                     }
@@ -479,192 +482,190 @@ namespace SiedlerVonSaffar.GameLogic
 
             }
 
-            TxQueue.Enqueue(new TransmitMessage(CurrentPlayer.ClientIP, new TcpIpProtocol().SERVER_SET_BANDIT, TransmitMessage.TransmitTyps.TO_OWN));
+            TxQueue.Enqueue(new NetworkMessageServer(CurrentPlayer.Name, TcpIpProtocolType.SERVER_SET_BANDIT, new object[] { "Du musst den Banditen versetzen" }, MessageTyps.TO_OWN));
         }
 
-        internal void HandleProgressCards(byte[] data)
+        internal void HandleProgressCards(GameObjects.Menu.Cards.Progress.ProgressCard card)
         {
-            GameObjects.Menu.Cards.Progress.ProgressCard card = (GameObjects.Menu.Cards.Progress.ProgressCard)Deserialize(data);
-
             CurrentPlayer.PlayedProgressCards.Add(card);
 
-            card = (from p in CurrentPlayer.ProgressCards where p.GetType() == card.GetType() select p).First();
+            card = (from p in CurrentPlayer.ProgressCards where p.GetType() == card.GetType() select p).FirstOrDefault();
 
-            CurrentPlayer.ProgressCards.Remove(card);
+            if(card != null)
+            {
+                CurrentPlayer.ProgressCards.Remove(card);
 
-            if (card is GameObjects.Menu.Cards.Progress.Hyperloop)
-            {
-                HandleProgressCardHyperloop();
-            }
-            else if (card is GameObjects.Menu.Cards.Progress.Monopoly)
-            {
-                HandleProgressCardMonopoly((GameObjects.Menu.Cards.Progress.Monopoly)card);
-            }
-            else if (card is GameObjects.Menu.Cards.Progress.Invention)
-            {
-                HandleProgressCardInvention((GameObjects.Menu.Cards.Progress.Invention)card);
-            }
-            else if (card is GameObjects.Menu.Cards.Progress.SpaceMarine)
-            {
-                HandleProgresscardSpaceMarine();
-            }
+                if (card is GameObjects.Menu.Cards.Progress.Hyperloop)
+                {
+                    HandleProgressCardHyperloop();
+                }
+                else if (card is GameObjects.Menu.Cards.Progress.Monopoly)
+                {
+                    HandleProgressCardMonopoly((GameObjects.Menu.Cards.Progress.Monopoly)card);
+                }
+                else if (card is GameObjects.Menu.Cards.Progress.Invention)
+                {
+                    HandleProgressCardInvention((GameObjects.Menu.Cards.Progress.Invention)card);
+                }
+                else if (card is GameObjects.Menu.Cards.Progress.SpaceMarine)
+                {
+                    HandleProgresscardSpaceMarine();
+                }
 
-            SerializePlayerData(CurrentPlayer);
+                SendPlayerData(CurrentPlayer);
+            }            
+
+
         }
 
-        internal void HandleDeal(byte[] dealData)
+        internal void HandleDeal(object[] dealData)
         {
-            byte[] palyerCard = new byte[(dealData.Length - 4) / 2];
-            byte[] serverCard = new byte[(dealData.Length - 4) / 2];
 
-            for (int i = 0; i < palyerCard.Length; i++)
+            if(dealData.Length == 2)
             {
-                palyerCard[i] = dealData[i + 4];
-            }
-
-            for (int i = 0; i < serverCard.Length; i++)
-            {
-                serverCard[i] = dealData[i + ((dealData.Length - 4) / 2)];
-            }
-
-            MemoryStream stream = new MemoryStream(palyerCard);
-
-            IFormatter formatter = new BinaryFormatter();
-
-            GameObjects.Menu.Cards.Resources.ResourceCard resourceCardPlayer = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
-
-            stream = new MemoryStream(serverCard);
-
-            GameObjects.Menu.Cards.Resources.ResourceCard resourceCardServer = (GameObjects.Menu.Cards.Resources.ResourceCard)formatter.Deserialize(stream);
-
-            short dealRelation = 4;
-
-            GameObjects.Buildings.Building upperAngleBuilding;
-            GameObjects.Buildings.Building lowerAngleBuilding;
-
-            foreach (DataStruct.Harbor element in containerData.Harbors)
-            {
-                upperAngleBuilding = null;
-                lowerAngleBuilding = null;
-
-                if (element.UpperAngel.BuildTyp != DataStruct.BuildTypes.NONE)
+                if(dealData[0] is GameObjects.Menu.Cards.Resources.ResourceCard
+                    && dealData[1] is GameObjects.Menu.Cards.Resources.ResourceCard)
                 {
-                    if (element.UpperAngel.BuildTyp == DataStruct.BuildTypes.CITY)
-                        upperAngleBuilding = (GameObjects.Buildings.City)element.UpperAngel.Building;
-                    else
-                        upperAngleBuilding = (GameObjects.Buildings.Outpost)element.UpperAngel.Building;
-                }
+                    GameObjects.Menu.Cards.Resources.ResourceCard resourceCardPlayer = (GameObjects.Menu.Cards.Resources.ResourceCard)dealData[0];
 
-                if (element.LowerAngel.Building != null)
-                {
-                    if (element.LowerAngel.BuildTyp == DataStruct.BuildTypes.CITY)
-                        lowerAngleBuilding = (GameObjects.Buildings.City)element.UpperAngel.Building;
-                    else
-                        lowerAngleBuilding = (GameObjects.Buildings.Outpost)element.UpperAngel.Building;
-                }
+                    GameObjects.Menu.Cards.Resources.ResourceCard resourceCardServer = (GameObjects.Menu.Cards.Resources.ResourceCard)dealData[1];
 
-                if (upperAngleBuilding != null && upperAngleBuilding.PlayerID == CurrentPlayer.PlayerID)
-                {
-                    if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.GetType())
+                    short dealRelation = 4;
+
+                    GameObjects.Buildings.Building upperAngleBuilding;
+                    GameObjects.Buildings.Building lowerAngleBuilding;
+
+                    foreach (DataStruct.Harbor element in containerData.Harbors)
                     {
-                        dealRelation = 2;
-                        break;
-                    }
-                    else
-                        dealRelation = 3;
-                }
-                if (dealRelation > 2)
-                {
-                    if (lowerAngleBuilding != null && lowerAngleBuilding.PlayerID == CurrentPlayer.PlayerID)
-                    {
-                        if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.Resource.GetType())
+                        upperAngleBuilding = null;
+                        lowerAngleBuilding = null;
+
+                        if (element.UpperAngel.BuildTyp != DataStruct.BuildTypes.NONE)
                         {
-                            dealRelation = 2;
-                            break;
+                            if (element.UpperAngel.BuildTyp == DataStruct.BuildTypes.CITY)
+                                upperAngleBuilding = (GameObjects.Buildings.City)element.UpperAngel.Building;
+                            else
+                                upperAngleBuilding = (GameObjects.Buildings.Outpost)element.UpperAngel.Building;
                         }
-                        else
-                            dealRelation = 3;
+
+                        if (element.LowerAngel.Building != null)
+                        {
+                            if (element.LowerAngel.BuildTyp == DataStruct.BuildTypes.CITY)
+                                lowerAngleBuilding = (GameObjects.Buildings.City)element.UpperAngel.Building;
+                            else
+                                lowerAngleBuilding = (GameObjects.Buildings.Outpost)element.UpperAngel.Building;
+                        }
+
+                        if (upperAngleBuilding != null && upperAngleBuilding.PlayerID == CurrentPlayer.PlayerID)
+                        {
+                            if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.GetType())
+                            {
+                                dealRelation = 2;
+                                break;
+                            }
+                            else
+                                dealRelation = 3;
+                        }
+                        if (dealRelation > 2)
+                        {
+                            if (lowerAngleBuilding != null && lowerAngleBuilding.PlayerID == CurrentPlayer.PlayerID)
+                            {
+                                if (element.SpecialHarbor != null && element.SpecialHarbor.GetType() == resourceCardPlayer.Resource.GetType())
+                                {
+                                    dealRelation = 2;
+                                    break;
+                                }
+                                else
+                                    dealRelation = 3;
+                            }
+                        }
                     }
-                }
-            }
 
-            bool canDeal = false;
+                    bool canDeal = false;
 
-            if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Biomass)
-            {
-                if (CurrentPlayer.ResourceCardsBiomass >= dealRelation)
-                {
-                    canDeal = true;
-
-                    for (int i = 0; i < dealRelation; i++)
+                    if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Biomass)
                     {
-                        CurrentPlayer.ResourceCardsBiomass--;
-                        ResourceCardsBiomass++;
+                        if (CurrentPlayer.ResourceCardsBiomass >= dealRelation)
+                        {
+                            canDeal = true;
+
+                            for (int i = 0; i < dealRelation; i++)
+                            {
+                                CurrentPlayer.ResourceCardsBiomass--;
+                                ResourceCardsBiomass++;
+                            }
+                        }
+
                     }
-                }
-
-            }
-            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.CarbonFibres)
-            {
-                if (CurrentPlayer.ResourceCardsCarbonFibres >= dealRelation)
-                {
-                    canDeal = true;
-
-                    for (int i = 0; i < dealRelation; i++)
+                    else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.CarbonFibres)
                     {
-                        CurrentPlayer.ResourceCardsCarbonFibres--;
-                        ResourceCardsCarbonFibres++;
-                    }
-                }
-            }
-            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Deuterium)
-            {
-                if (CurrentPlayer.ResourceCardsDeuterium >= dealRelation)
-                {
-                    canDeal = true;
+                        if (CurrentPlayer.ResourceCardsCarbonFibres >= dealRelation)
+                        {
+                            canDeal = true;
 
-                    for (int i = 0; i < dealRelation; i++)
+                            for (int i = 0; i < dealRelation; i++)
+                            {
+                                CurrentPlayer.ResourceCardsCarbonFibres--;
+                                ResourceCardsCarbonFibres++;
+                            }
+                        }
+                    }
+                    else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Deuterium)
                     {
-                        CurrentPlayer.ResourceCardsDeuterium--;
-                        ResourceCardsDeuterium++;
-                    }
-                }
-            }
-            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.FriendlyAlien)
-            {
-                if (CurrentPlayer.ResourceCardsFriendlyAlien >= dealRelation)
-                {
-                    canDeal = true;
+                        if (CurrentPlayer.ResourceCardsDeuterium >= dealRelation)
+                        {
+                            canDeal = true;
 
-                    for (int i = 0; i < dealRelation; i++)
+                            for (int i = 0; i < dealRelation; i++)
+                            {
+                                CurrentPlayer.ResourceCardsDeuterium--;
+                                ResourceCardsDeuterium++;
+                            }
+                        }
+                    }
+                    else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.FriendlyAlien)
                     {
-                        CurrentPlayer.ResourceCardsFriendlyAlien--;
-                        ResourceCardsFriendlyAlien++;
-                    }
-                }
-            }
-            else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Titan)
-            {
-                if (CurrentPlayer.ResourceCardsTitan >= dealRelation)
-                {
-                    canDeal = true;
+                        if (CurrentPlayer.ResourceCardsFriendlyAlien >= dealRelation)
+                        {
+                            canDeal = true;
 
-                    for (int i = 0; i < dealRelation; i++)
+                            for (int i = 0; i < dealRelation; i++)
+                            {
+                                CurrentPlayer.ResourceCardsFriendlyAlien--;
+                                ResourceCardsFriendlyAlien++;
+                            }
+                        }
+                    }
+                    else if (resourceCardPlayer is GameObjects.Menu.Cards.Resources.Titan)
                     {
-                        CurrentPlayer.ResourceCardsTitan--;
-                        ResourceCardsTitan++;
-                    }
-                }
-            }
+                        if (CurrentPlayer.ResourceCardsTitan >= dealRelation)
+                        {
+                            canDeal = true;
 
-            if (canDeal)
-            {
-                SerializePlayerData(CurrentPlayer);
+                            for (int i = 0; i < dealRelation; i++)
+                            {
+                                CurrentPlayer.ResourceCardsTitan--;
+                                ResourceCardsTitan++;
+                            }
+                        }
+                    }
+
+                    if (canDeal)
+                    {
+                        SendPlayerData(CurrentPlayer);
+                    }
+                    else
+                    {
+                        //TODO: data loschicken nur wie
+                    }
+                    
+                }
+
+
+
+
             }
-            else
-            {
-                //TODO: data loschicken nur wie
-            }
+            
 
         }
 
@@ -790,21 +791,12 @@ namespace SiedlerVonSaffar.GameLogic
                 }
             }
 
-            SerializePlayerData(CurrentPlayer);
+            SendPlayerData(CurrentPlayer);
 
             foreach (GameObjects.Player.Player playerElement in Players)
             {
-                SerializePlayerData(playerElement);
+                SendPlayerData(playerElement);
             }
-        }
-
-        internal object Deserialize(byte[] data)
-        {
-            MemoryStream stream = new MemoryStream(data);
-            stream.Seek(5, SeekOrigin.Begin);
-            IFormatter formatter = new BinaryFormatter();
-
-            return formatter.Deserialize(stream);
         }
 
         internal byte[] Serialize(byte[] protocol, object serializeableObject)
@@ -836,46 +828,28 @@ namespace SiedlerVonSaffar.GameLogic
             return data;
         }
 
-
-
-        internal GameObjects.Player.Player HandelPlayerData(byte[] playerData)
+        internal void SendContainerData()
         {
-            MemoryStream stream = new MemoryStream(playerData);
-            stream.Seek(5, SeekOrigin.Begin);
-            IFormatter formatter = new BinaryFormatter();
+            TxQueue.Enqueue(new NetworkMessageServer(CurrentPlayer.Name, TcpIpProtocolType.SERVER_CONTAINER_DATA_OWN, new object[] { containerData }, MessageTyps.TO_OWN));
 
-            return (GameObjects.Player.Player)formatter.Deserialize(stream);
+            ResetContainerDataBuildStruct();
         }
 
-        internal void SerializeContainerData()
+        internal void SendPlayerData(GameObjects.Player.Player player)
         {
-            byte[] data = this.Serialize(new TcpIpProtocol().SERVER_CONTAINER_DATA_OWN, this.containerData);
-
-            TxQueue.Enqueue(new TransmitMessage(CurrentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
-
-            data = this.Serialize(new TcpIpProtocol().SERVER_CONTAINER_DATA_OTHER, containerData);
-
-            if (!Configuration.DeveloperParameter.IsPrototyp)
-                TxQueue.Enqueue(new TransmitMessage(CurrentPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
-        }
-
-        internal void SerializePlayerData(GameObjects.Player.Player player)
-        {
-            byte[] data = this.Serialize(new TcpIpProtocol().SERVER_PLAYER_DATA, player);
-
-            TxQueue.Enqueue(new TransmitMessage(player.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
+            TxQueue.Enqueue(new NetworkMessageServer(player.Name, TcpIpProtocolType.PLAYER_DATA, new object[] { player }, MessageTyps.TO_OWN));
 
             //TODO make the proxy
 
             if(!Configuration.DeveloperParameter.IsPrototyp)
-                TxQueue.Enqueue(new TransmitMessage(player.ClientIP, data, TransmitMessage.TransmitTyps.TO_OTHER));
+                TxQueue.Enqueue(new NetworkMessageServer(player.Name, TcpIpProtocolType.PLAYER_DATA, new object[] { player }, MessageTyps.TO_OTHER));
         }
 
-        internal void DeserializeContainerData(byte[] data)
+        internal void SetNewContainerData(DataStruct.Container containerData)
         {
-            this.containerData = (DataStruct.Container)Deserialize(data);
+            this.containerData = containerData;
 
-            ResetContainerDataBuildStruct();
+            TxQueue.Enqueue(new NetworkMessageServer(CurrentPlayer.Name, TcpIpProtocolType.SERVER_CONTAINER_DATA_OTHER, new object[] { containerData }, MessageTyps.TO_OTHER));
         }
 
         #endregion
@@ -956,8 +930,12 @@ namespace SiedlerVonSaffar.GameLogic
 
         internal void nextPlayer()
         {
+            //TODO SEND disconnect to Currentplayer
+            
             Players.Enqueue(CurrentPlayer);
             CurrentPlayer = Players.Dequeue();
+
+            //TODO SEND connect to currentplayer
         }
 
         internal void FoundationStages(ref int foundationStageRoundCounter)
@@ -973,7 +951,7 @@ namespace SiedlerVonSaffar.GameLogic
                     return;
 
                 //containerData.Notify();
-                SerializeContainerData();
+                SendContainerData();
 
             }
             else
@@ -983,13 +961,12 @@ namespace SiedlerVonSaffar.GameLogic
                 foundationStageRoundCounter++;
 
                 //containerData.Notify();
-                SerializeContainerData();
+                SendContainerData();
             }
         }
 
         internal void SetupNewPlayer(GameObjects.Player.Player newPlayer)
         { 
-
             newPlayer.Cities = 4;
 
             newPlayer.Outposts = 5;
@@ -998,9 +975,7 @@ namespace SiedlerVonSaffar.GameLogic
 
             Players.Enqueue(newPlayer);
 
-            byte[] data = Serialize(new TcpIpProtocol().SERVER_PLAYER_DATA, newPlayer);
-
-            TxQueue.Enqueue(new TransmitMessage(newPlayer.ClientIP, data, TransmitMessage.TransmitTyps.TO_OWN));
+            TxQueue.Enqueue(new NetworkMessageServer(newPlayer.Name, TcpIpProtocolType.SERVER_PLAYER_DATA, new object[] { newPlayer }, MessageTyps.TO_OWN));
         }
 
         #endregion
@@ -1820,65 +1795,44 @@ namespace SiedlerVonSaffar.GameLogic
 
                     #endregion
 
-                    if (rxObject is RecieveMessage)
+                    if (rxObject is NetworkMessageClient)
                     {
                         if (CurrentState is StateMachine.FoundationStage)
                         {
-                            GetName((RecieveMessage)rxObject);
+                            GetName((NetworkMessageClient)rxObject);
                         }
                         else if (CurrentState is StateMachine.FoundationStageRollDice)
                         {
-                            DiceRolled((RecieveMessage)rxObject);
+                            DiceRolled((NetworkMessageClient)rxObject);
                         }
                         else if (CurrentState is StateMachine.FoundationStageRoundOne
                             || CurrentState is StateMachine.FoundationStageRoundTwo)
                         {
-                            FoundationRoundAllSet((RecieveMessage)rxObject);
+                            FoundationRoundAllSet((NetworkMessageClient)rxObject);
                         }
                         else if (CurrentState is StateMachine.PlayerRollDice)
                         {
-                            DiceRolled((RecieveMessage)rxObject);
+                            DiceRolled((NetworkMessageClient)rxObject);
                         }
                         else if (CurrentState is StateMachine.PlayerStageBuild)
                         {
-                            BuildingsSet((RecieveMessage)rxObject);
+                            BuildingsSet((NetworkMessageClient)rxObject);
                         }
                         else if (CurrentState is StateMachine.PlayerStageDeal)
                         {
-                            Dealed((RecieveMessage)rxObject);
+                            Dealed((NetworkMessageClient)rxObject);
                         }
-                    }
-
-                    
-
-
+                    }           
                 }
                 else
                 {
-                    if (rxObject is RecieveMessage)
+                    if (rxObject is short)
                     {
-                        RecieveMessage message = (RecieveMessage)rxObject;
+                        PlayersReady = (short)rxObject;
 
-                        if (new TcpIpProtocol().IsClientDataPattern(message.Data))
-                        {
-                            byte[] equalBytes = { message.Data[0], message.Data[1], message.Data[2], message.Data[3] };
+                        GameHasStarted = true;
 
-                            if (new TcpIpProtocol().PLAYER_READY.SequenceEqual(equalBytes))
-                            {
-                                if (GameHasStarted == false)
-                                {
-                                    PlayersReady++;
-
-                                    if (PlayersReady >= 3)
-                                    {
-                                        GameHasStarted = true;
-
-                                        TxQueue.Enqueue(new TransmitMessage(new TcpIpProtocol().SERVER_NEED_PLAYER_NAME));
-                                        SetState(new StateMachine.FoundationStage(this));
-                                    }
-                                }
-                            }
-                        }
+                        SetState(new StateMachine.FoundationStage(this));
                     }
                 }
             }

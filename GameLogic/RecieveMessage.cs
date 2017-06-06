@@ -9,13 +9,13 @@ namespace SiedlerVonSaffar.GameLogic
 {
     public class RecieveMessage
     {
-        public IPEndPoint ClientIP { get; set; }
         public byte[] Data { get; set; }
 
+        public string PlayerName { get; private set; }
 
-        public RecieveMessage(IPEndPoint clientIP, byte[] data)
+
+        public RecieveMessage(byte[] data)
         {
-            ClientIP = clientIP;
             Data = data;
         }
     }
